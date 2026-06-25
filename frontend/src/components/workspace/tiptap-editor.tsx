@@ -259,6 +259,7 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
   const [showAI, setShowAI] = useState(false);
   const [showLatex, setShowLatex] = useState(false);
   const [compositionTick, setCompositionTick] = useState(0);
+  const editorRef = useRef<any>(null);
 
   const editor = useEditor({
     extensions: [
@@ -266,6 +267,25 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       Placeholder.configure({ placeholder: placeholder ?? "开始编写笔记…" }),
       Image.configure({ inline: true, allowBase64: true }),
       Mathematics.configure({
+        inlineOptions: {
+          onClick: (_node: any, pos: number) => {
+            // 单击已渲染的行内公式 → 打开 prompt 编辑 LaTeX
+            const current = editorRef.current?.getAttributesAt(pos, "inline-math")?.latex ?? "";
+            const latex = prompt("编辑 LaTeX 公式：", current);
+            if (latex !== null && latex.trim()) {
+              editorRef.current?.chain().setNodeSelection(pos).updateInlineMath({ latex: latex.trim() }).focus().run();
+            }
+          },
+        },
+        blockOptions: {
+          onClick: (_node: any, pos: number) => {
+            const current = editorRef.current?.getAttributesAt(pos, "block-math")?.latex ?? "";
+            const latex = prompt("编辑 LaTeX 公式：", current);
+            if (latex !== null && latex.trim()) {
+              editorRef.current?.chain().setNodeSelection(pos).updateBlockMath({ latex: latex.trim() }).focus().run();
+            }
+          },
+        },
         katexOptions: {
           throwOnError: false,
           macros: { "\\R": "\\mathbb{R}", "\\N": "\\mathbb{N}" },
@@ -285,10 +305,13 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       },
     },
     onCreate: ({ editor }) => {
-      // 将已有 $...$ 文本迁移为 Math 节点
+      editorRef.current = editor;
       migrateMathStrings(editor);
     },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      editorRef.current = editor;
+      onChange(editor.getHTML());
+    },
   });
 
   if (!editor) return null;
