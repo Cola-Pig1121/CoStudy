@@ -9,6 +9,7 @@ import Image from "@tiptap/extension-image";
 import Mathematics, { migrateMathStrings } from "@tiptap/extension-mathematics";
 import { Iframe } from "./iframe-extension";
 import { MediaInsert } from "./media-insert";
+import { LatexInlineEditor } from "./latex-inline-editor";
 import {
   Bold,
   Code,
@@ -261,6 +262,7 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
   const [showAI, setShowAI] = useState(false);
   const [showLatex, setShowLatex] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
+  const [editingLatex, setEditingLatex] = useState<{ pos: number; type: "inline" | "block"; latex: string } | null>(null);
   const [compositionTick, setCompositionTick] = useState(0);
   const editorRef = useRef<any>(null);
 
@@ -274,19 +276,13 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
         inlineOptions: {
           onClick: (node: any, pos: number) => {
             const current = node?.attrs?.latex ?? "";
-            const latex = prompt("编辑 LaTeX 公式：", current);
-            if (latex !== null && latex.trim()) {
-              editorRef.current?.chain().setNodeSelection(pos).updateInlineMath({ latex: latex.trim() }).focus().run();
-            }
+            setEditingLatex({ pos, type: "inline", latex: current });
           },
         },
         blockOptions: {
           onClick: (node: any, pos: number) => {
             const current = node?.attrs?.latex ?? "";
-            const latex = prompt("编辑 LaTeX 公式：", current);
-            if (latex !== null && latex.trim()) {
-              editorRef.current?.chain().setNodeSelection(pos).updateBlockMath({ latex: latex.trim() }).focus().run();
-            }
+            setEditingLatex({ pos, type: "block", latex: current });
           },
         },
         katexOptions: {
@@ -325,6 +321,15 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
     } else {
       editor.chain().focus().setImage({ src, alt: title ?? "" }).run();
     }
+  };
+
+  const handleLatexUpdate = (latex: string, pos: number, mathType: "inline" | "block") => {
+    if (mathType === "block") {
+      editorRef.current?.chain().setNodeSelection(pos).updateBlockMath({ latex }).focus().run();
+    } else {
+      editorRef.current?.chain().setNodeSelection(pos).updateInlineMath({ latex }).focus().run();
+    }
+    setEditingLatex(null);
   };
 
   return (
@@ -382,6 +387,19 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
         <Btn onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="重做">
           <Redo className="h-4 w-4" /></Btn>
       </div>
+
+      {/* 内联 LaTeX 编辑器 */}
+      {editingLatex && (
+        <div className="px-4 py-2 bg-[#4a9d9a]/3 border-b border-[#4a9d9a]/10 shrink-0">
+          <LatexInlineEditor
+            initialLatex={editingLatex.latex}
+            pos={editingLatex.pos}
+            type={editingLatex.type}
+            onUpdate={handleLatexUpdate}
+            onCancel={() => setEditingLatex(null)}
+          />
+        </div>
+      )}
 
       {/* BubbleMenu: 选中文本时弹出 */}
       {editor && (
