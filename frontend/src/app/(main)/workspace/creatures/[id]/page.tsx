@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -57,12 +57,22 @@ export default function DraftDetailPage() {
       .then((data) => {
         setResource(data);
         setTitle(data.title);
-        // markdown content from backend is HTML
-        setContent(data.content ?? "<p></p>");
+        setContent(data.content ?? "");
         setTextbookId(data.textbook_id ?? null);
       })
       .catch(() => router.replace("/workspace/creatures"));
   }, [user, resourceId, router]);
+
+  // 解析 Excalidraw 内容为 initialData
+  const parsedExcalidrawData = useMemo(() => {
+    if (!content || resource?.type !== "excalidraw") return undefined;
+    try {
+      const data = JSON.parse(content);
+      return { elements: data.elements ?? [], appState: data.appState ?? {} };
+    } catch {
+      return undefined;
+    }
+  }, [content, resource]);
 
   useEffect(() => {
     if (!user) return;
@@ -172,15 +182,11 @@ export default function DraftDetailPage() {
       {/* 内容区 */}
       <div className="flex-1 min-h-0">
         {isExcalidraw ? (
-          <ExcalidrawWrapper onAPIReady={(api) => {
-            excalidrawAPIRef.current = api;
-            if (content) {
-              try {
-                const data = JSON.parse(content);
-                if (data.elements) api.updateScene({ elements: data.elements });
-              } catch {}
-            }
-          }} />
+          <ExcalidrawWrapper
+            key={resource.id + "-" + (content ? "loaded" : "loading")}
+            onAPIReady={(api) => { excalidrawAPIRef.current = api; }}
+            initialData={parsedExcalidrawData}
+          />
         ) : (
           <TipTapEditor content={content} onChange={setContent} placeholder="开始编辑笔记..." />
         )}

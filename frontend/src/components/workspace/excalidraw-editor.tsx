@@ -12,13 +12,16 @@ export interface ExcalidrawAPI {
 
 interface ExcalidrawEditorProps {
   onAPIReady?: (api: ExcalidrawAPI) => void;
+  initialData?: { elements?: any[]; appState?: Record<string, any> } | null;
 }
 
 /**
  * Excalidraw 画布封装（纯客户端组件）。
- * 通过 onAPIReady 回调暴露 excalidrawAPI。
+ * - langCode="zh-CN" 中文化
+ * - 通过 initialData 加载已有内容
+ * - 通过 onAPIReady 回调暴露命令式 API
  */
-export function ExcalidrawEditor({ onAPIReady }: ExcalidrawEditorProps) {
+export function ExcalidrawEditor({ onAPIReady, initialData }: ExcalidrawEditorProps) {
   const apiRef = useRef<ExcalidrawAPI | null>(null);
 
   const handleReady = useCallback(
@@ -33,6 +36,8 @@ export function ExcalidrawEditor({ onAPIReady }: ExcalidrawEditorProps) {
     <div className="w-full h-full">
       <Excalidraw
         excalidrawAPI={handleReady}
+        langCode="zh-CN"
+        initialData={initialData ?? undefined}
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -41,9 +46,6 @@ export function ExcalidrawEditor({ onAPIReady }: ExcalidrawEditorProps) {
           },
         }}
         theme="light"
-        initialData={{
-          appState: { viewBackgroundColor: "#ffffff" },
-        }}
       />
     </div>
   );
