@@ -176,28 +176,69 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
     if (!previewRef.current || !input.trim()) return;
     setCopying(true);
     try {
+      // 1. html-to-image → data URL
       const dataUrl = await toPng(previewRef.current, {
         pixelRatio: 2,
         backgroundColor: "white",
         style: { padding: "16px", borderRadius: "8px" },
       });
-      const resp = await fetch(dataUrl);
-      const blob = await resp.blob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.error("Failed to copy:", e);
-      // fallback: 下载
+
+      // 2. data URL → canvas → blob
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      // 3. 尝试 Clipboard API (HTTPS/localhost)
+      let copied = false;
       try {
-        const dataUrl = await toPng(previewRef.current, { pixelRatio: 2, backgroundColor: "white" });
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = mode === "latex" ? "formula.png" : "markdown.png";
-        a.click();
+        const blob = await new Promise<Blob>((resolve) =>
+          canvas.toBlob((b) => resolve(b!), "image/png")
+        );
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+        copied = true;
+      } catch {
+        // Clipboard API 不可用 (HTTP 非 localhost)
+      }
+
+      // 4. fallback: 用 Selection API + execCommand 复制
+      if (!copied) {
+        const tempImg = document.createElement("img");
+        tempImg.src = dataUrl;
+        tempImg.style.position = "fixed";
+        tempImg.style.left = "-9999px";
+        tempImg.style.top = "0";
+        tempImg.style.maxWidth = "600px";
+        document.body.appendChild(tempImg);
+        // 等待图片加载
+        await new Promise((r) => setTimeout(r, 100));
+        const range = document.createRange();
+        range.selectNode(tempImg);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.execCommand("copy");
+        sel?.removeAllRanges();
+        document.body.removeChild(tempImg);
+        copied = true;
+      }
+
+      if (copied) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch {}
+      }
+    } catch (e) {
+      console.error("Copy failed:", e);
     } finally {
       setCopying(false);
     }
