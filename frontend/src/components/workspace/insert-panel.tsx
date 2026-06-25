@@ -6,7 +6,7 @@ import Markdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { toPng, toSvg } from "html-to-image";
+import { toSvg } from "html-to-image";
 import {
   BookOpen,
   Check,
@@ -115,71 +115,43 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
   const [renderedImageUrl, setRenderedImageUrl] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // 自动渲染预览图片（输入变化时延迟渲染）
-  useEffect(() => {
-    if (!input.trim()) { setRenderedImageUrl(null); return; }
-    const timer = setTimeout(() => renderToImage(), 300);
-    return () => clearTimeout(timer);
-  }, [input, mode]);
-
   const renderToImage = useCallback(async () => {
     if (!input.trim()) return;
     setRendering(true);
+    const t0 = performance.now();
     try {
-      // 渲染到隔离 div
       const renderDiv = document.createElement("div");
-      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
+      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:16px 24px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
       document.body.appendChild(renderDiv);
 
       if (mode === "latex") {
+        // KaTeX 同步渲染，无需等待
         renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
       } else {
         const { createRoot } = await import("react-dom/client");
         const root = createRoot(renderDiv);
-        await new Promise<void>((resolve) => {
-          root.render(
-            <div style={{ background: "white", padding: "8px", borderRadius: "8px" }}>
-              <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
-            </div>
-          );
-          setTimeout(resolve, 500);
-        });
+        root.render(
+          <div style={{ background: "white", padding: "4px", borderRadius: "8px" }}>
+            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
+          </div>
+        );
+        // 只等一帧让 React 提交 DOM
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       }
 
-      // html-to-image → data URL
-      // fontEmbedCSS:"inline" 内联所有 CSS，避免外部资源导致 canvas taint
-      const dataUrl = await toPng(renderDiv, {
-        pixelRatio: 3,
-        backgroundColor: "white",
-        cacheBust: true,
-        style: { overflow: "visible" },
-      });
+      // toSvg（不用 canvas，无 CORS/taint 问题）
+      const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
 
       // 清理
-      if (mode === "markdown") {
-        // 需要 unmount React root
-        renderDiv.innerHTML = "";
-      }
+      if (mode === "markdown") renderDiv.innerHTML = "";
       document.body.removeChild(renderDiv);
 
-      setRenderedImageUrl(dataUrl);
+      const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      setRenderedImageUrl(URL.createObjectURL(svgBlob));
+      console.log(`Rendered in ${Math.round(performance.now() - t0)}ms`);
     } catch (e) {
       console.error("Render failed:", e);
-      // 如果 toPng 失败（taint），降级为 toSvg
-      try {
-        const renderDiv2 = document.createElement("div");
-        renderDiv2.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;";
-        renderDiv2.innerHTML = mode === "latex"
-          ? katex.renderToString(input, { throwOnError: false, displayMode: true })
-          : "";
-        document.body.appendChild(renderDiv2);
-        await new Promise((r) => setTimeout(r, 100));
-        const svgStr = await toSvg(renderDiv2, { backgroundColor: "white" });
-        document.body.removeChild(renderDiv2);
-        setRenderedImageUrl("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr));
-      } catch {
-        setRenderedImageUrl(null);
-      }
+      setRenderedImageUrl(null);
     } finally {
       setRendering(false);
     }
@@ -225,26 +197,24 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
 
         {/* 渲染结果图片 */}
         <div className="px-4 pt-2 flex-1 overflow-y-auto">
-          {rendering && (
-            <div className="flex items-center justify-center py-4 text-sm text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin mr-2 text-[#e8b86d]" />渲染中...
-            </div>
-          )}
           {renderedImageUrl && !rendering && (
             <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-3 bg-[#4a9d9a]/3">
               <div className="text-[11px] text-[#4a9d9a] font-medium mb-2 flex items-center gap-1.5">
-                ✅ 渲染完成 · 右键下方图片 → 复制图片 → 粘贴到 Excalidraw
+                ✅ 右键下方图片 → 复制图片 → 粘贴到 Excalidraw
               </div>
-              <img
-                src={renderedImageUrl}
-                alt="rendered"
-                className="max-w-full rounded-lg bg-white border border-gray-200 shadow-sm"
-              />
+              <img src={renderedImageUrl} alt="rendered" className="max-w-full rounded-lg bg-white border border-gray-200 shadow-sm" />
             </div>
           )}
-          {!renderedImageUrl && !rendering && input.trim() && (
-            <div className="text-xs text-gray-400 py-2">输入内容后自动生成图片预览</div>
-          )}
+        </div>
+
+        {/* 底部按钮 */}
+        <div className="px-4 py-3 mt-auto border-t border-gray-100">
+          <button onClick={renderToImage} disabled={!input.trim() || rendering}
+            className={cn("w-full flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors",
+              rendering ? "bg-[#e8b86d]/20 text-[#e8b86d]" : "bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50")}>
+            {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sigma className="h-4 w-4" />}
+            {rendering ? "渲染中…" : renderedImageUrl ? "重新生成" : "生成图片"}
+          </button>
         </div>
       </div>
     </div>
