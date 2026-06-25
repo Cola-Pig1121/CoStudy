@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const tabs = [
+  { id: "drafts", label: "我的草稿", href: "/workspace/drafts", color: "text-gray-700", disabled: false },
   { id: "mindmap", label: "思维导图", href: "/workspace/mindmap", color: "text-[#4a9d9a]", disabled: false },
   { id: "notes", label: "知识笔记", href: "/workspace/notes", color: "text-[#e8b86d]", disabled: false },
   { id: "exam-cut", label: "试卷框选", href: "/workspace/exam-cut", color: "text-[#c17767]", disabled: true },
@@ -51,7 +52,7 @@ export default function WorkspaceLayout({
       </div>
 
       {/* 内容区 - 减去 AppShell Header 64px + TabBar ~50px */}
-      <div className="h-[calc(100vh-64px-50px)]">{children}</div>
+      <div className="flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }

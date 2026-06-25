@@ -34,7 +34,7 @@ export type ResourceType = "excalidraw" | "markdown";
 export type ResourceStatus = 0 | 1 | 2; // 待审核 | 已通过 | 已拒绝
 
 export interface SharedResource {
-  id: string;
+  id: number;
   textbook_id: number;
   user_id: number;
   title: string;

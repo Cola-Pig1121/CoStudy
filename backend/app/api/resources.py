@@ -31,13 +31,17 @@ async def list_resources(
     type: str | None = Query(None, pattern=r"^(excalidraw|markdown)$"),
     textbook_id: int | None = Query(None),
     status_filter: int | None = Query(None, alias="status", ge=0, le=2),
+    mine: bool = Query(False, description="仅显示当前用户的资源"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
 ) -> dict:
-    """资源列表，支持按类型、教材节点、状态筛选。"""
+    """资源列表，支持按类型、教材节点、状态筛选。mine=true 仅返回当前用户资源。"""
     q = select(SharedResource)
     count_q = select(func.count(SharedResource.id))
 
+    if mine:
+        q = q.where(SharedResource.user_id == user.id)
+        count_q = count_q.where(SharedResource.user_id == user.id)
     if type:
         q = q.where(SharedResource.type == type)
         count_q = count_q.where(SharedResource.type == type)
@@ -47,8 +51,8 @@ async def list_resources(
     if status_filter is not None:
         q = q.where(SharedResource.status == status_filter)
         count_q = count_q.where(SharedResource.status == status_filter)
-    else:
-        # 默认只显示已通过的资源
+    elif not mine:
+        # 非 mine 模式默认只显示已通过的资源
         q = q.where(SharedResource.status == 1)
         count_q = count_q.where(SharedResource.status == 1)
 
