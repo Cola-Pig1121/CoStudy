@@ -6,7 +6,7 @@ import Markdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { toSvg } from "html-to-image";
+import { toPng, toSvg } from "html-to-image";
 import {
   BookOpen,
   Check,
@@ -126,24 +126,14 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
     if (!input.trim()) return;
     setRendering(true);
     try {
+      // 渲染到隔离 div
+      const renderDiv = document.createElement("div");
+      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
+      document.body.appendChild(renderDiv);
+
       if (mode === "latex") {
-        // KaTeX HTML → 隔离 div → toSvg（不用 canvas，无 CORS 问题）
-        const renderDiv = document.createElement("div");
-        renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;";
         renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
-        document.body.appendChild(renderDiv);
-        await new Promise((r) => setTimeout(r, 100)); // 等待字体加载
-        const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
-        document.body.removeChild(renderDiv);
-        // SVG string → data URL（不用 canvas）
-        const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-        const dataUrl = URL.createObjectURL(svgBlob);
-        setRenderedImageUrl(dataUrl);
       } else {
-        // Markdown: 隔离 div → toSvg
-        const renderDiv = document.createElement("div");
-        renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:650px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
-        document.body.appendChild(renderDiv);
         const { createRoot } = await import("react-dom/client");
         const root = createRoot(renderDiv);
         await new Promise<void>((resolve) => {
@@ -154,16 +144,42 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
           );
           setTimeout(resolve, 500);
         });
-        const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
-        root.unmount();
-        document.body.removeChild(renderDiv);
-        const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-        const dataUrl = URL.createObjectURL(svgBlob);
-        setRenderedImageUrl(dataUrl);
       }
+
+      // html-to-image → data URL
+      // fontEmbedCSS:"inline" 内联所有 CSS，避免外部资源导致 canvas taint
+      const dataUrl = await toPng(renderDiv, {
+        pixelRatio: 3,
+        backgroundColor: "white",
+        cacheBust: true,
+        style: { overflow: "visible" },
+      });
+
+      // 清理
+      if (mode === "markdown") {
+        // 需要 unmount React root
+        renderDiv.innerHTML = "";
+      }
+      document.body.removeChild(renderDiv);
+
+      setRenderedImageUrl(dataUrl);
     } catch (e) {
       console.error("Render failed:", e);
-      setRenderedImageUrl(null);
+      // 如果 toPng 失败（taint），降级为 toSvg
+      try {
+        const renderDiv2 = document.createElement("div");
+        renderDiv2.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;";
+        renderDiv2.innerHTML = mode === "latex"
+          ? katex.renderToString(input, { throwOnError: false, displayMode: true })
+          : "";
+        document.body.appendChild(renderDiv2);
+        await new Promise((r) => setTimeout(r, 100));
+        const svgStr = await toSvg(renderDiv2, { backgroundColor: "white" });
+        document.body.removeChild(renderDiv2);
+        setRenderedImageUrl("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr));
+      } catch {
+        setRenderedImageUrl(null);
+      }
     } finally {
       setRendering(false);
     }
