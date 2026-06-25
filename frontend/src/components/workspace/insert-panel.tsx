@@ -6,7 +6,7 @@ import Markdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { toPng } from "html-to-image";
+import { toSvg } from "html-to-image";
 import {
   BookOpen,
   Check,
@@ -127,40 +127,20 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
     setRendering(true);
     try {
       if (mode === "latex") {
-        // KaTeX → HTML string → SVG data URL（直接，不依赖 DOM 截图）
-        const html = katex.renderToString(input, { throwOnError: false, displayMode: true });
-        // 用 canvas 把 HTML 文字渲染成图片
-        const canvas = document.createElement("canvas");
-        const scale = 3;
-        // 先测量文字尺寸
-        const measureDiv = document.createElement("div");
-        measureDiv.innerHTML = html;
-        measureDiv.style.cssText = "position:fixed;left:-9999px;font-size:28px;font-family:'LXGW WenKai',serif;display:inline-block;";
-        document.body.appendChild(measureDiv);
-        const rect = measureDiv.getBoundingClientRect();
-        canvas.width = Math.max(rect.width * scale, 100);
-        canvas.height = Math.max(rect.height * scale, 60);
-        document.body.removeChild(measureDiv);
-
-        const ctx = canvas.getContext("2d")!;
-        ctx.scale(scale, scale);
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width / scale, canvas.height / scale);
-        // 用 foreignObject SVG 方式渲染 KaTeX HTML
-        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width / scale}" height="${canvas.height / scale}">
-          <foreignObject width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:28px;color:#1f2937;padding:4px;display:inline-block;font-family:serif;">${html}</div>
-          </foreignObject>
-        </svg>`;
+        // KaTeX HTML → 隔离 div → toSvg（不用 canvas，无 CORS 问题）
+        const renderDiv = document.createElement("div");
+        renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;";
+        renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
+        document.body.appendChild(renderDiv);
+        await new Promise((r) => setTimeout(r, 100)); // 等待字体加载
+        const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
+        document.body.removeChild(renderDiv);
+        // SVG string → data URL（不用 canvas）
         const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-        const svgUrl = URL.createObjectURL(svgBlob);
-        const img = new window.Image();
-        await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = svgUrl; });
-        ctx.drawImage(img, 0, 0, canvas.width / scale, canvas.height / scale);
-        URL.revokeObjectURL(svgUrl);
-        setRenderedImageUrl(canvas.toDataURL("image/png"));
+        const dataUrl = URL.createObjectURL(svgBlob);
+        setRenderedImageUrl(dataUrl);
       } else {
-        // Markdown: 用 html-to-image 截取隔离 div
+        // Markdown: 隔离 div → toSvg
         const renderDiv = document.createElement("div");
         renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:650px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
         document.body.appendChild(renderDiv);
@@ -172,12 +152,13 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
               <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
             </div>
           );
-          // 等待 React 渲染 + 浏览器布局 + KaTeX 字体加载
           setTimeout(resolve, 500);
         });
-        const dataUrl = await toPng(renderDiv, { pixelRatio: 3, backgroundColor: "white" });
+        const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
         root.unmount();
         document.body.removeChild(renderDiv);
+        const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+        const dataUrl = URL.createObjectURL(svgBlob);
         setRenderedImageUrl(dataUrl);
       }
     } catch (e) {
