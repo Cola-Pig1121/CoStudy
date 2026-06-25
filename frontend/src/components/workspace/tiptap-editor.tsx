@@ -7,6 +7,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import Mathematics, { migrateMathStrings } from "@tiptap/extension-mathematics";
+import { Iframe } from "./iframe-extension";
+import { MediaInsert } from "./media-insert";
 import {
   Bold,
   Code,
@@ -258,6 +260,7 @@ interface TipTapEditorProps {
 export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorProps) {
   const [showAI, setShowAI] = useState(false);
   const [showLatex, setShowLatex] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
   const [compositionTick, setCompositionTick] = useState(0);
   const editorRef = useRef<any>(null);
 
@@ -266,6 +269,7 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       StarterKit,
       Placeholder.configure({ placeholder: placeholder ?? "开始编写笔记…" }),
       Image.configure({ inline: true, allowBase64: true }),
+      Iframe,
       Mathematics.configure({
         inlineOptions: {
           onClick: (_node: any, pos: number) => {
@@ -316,6 +320,14 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
 
   if (!editor) return null;
 
+  const handleMediaInsert = (type: "image" | "iframe", src: string, title?: string) => {
+    if (type === "iframe") {
+      (editor.chain().focus() as any).setIframe({ src, title: title ?? "嵌入内容" }).run();
+    } else {
+      editor.chain().focus().setImage({ src, alt: title ?? "" }).run();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* 顶部固定工具栏 */}
@@ -342,7 +354,7 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
           <Quote className="h-4 w-4" /></Btn>
         <Btn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="分割线">
           <Minus className="h-4 w-4" /></Btn>
-        <Btn onClick={() => { const url = prompt("输入图片 URL："); if (url) editor.chain().focus().setImage({ src: url }).run(); }} title="插入图片">
+        <Btn onClick={() => setShowMedia(true)} title="插入图片/嵌入网页">
           <ImagePlus className="h-4 w-4" /></Btn>
         <div className="w-px h-5 bg-gray-200 mx-1" />
         {/* LaTeX 公式按钮 */}
@@ -400,6 +412,9 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       <div className="flex-1 overflow-y-auto">
         <EditorContent editor={editor} />
       </div>
+
+      {/* 图片/嵌入弹窗 */}
+      {showMedia && <MediaInsert onInsert={handleMediaInsert} onClose={() => setShowMedia(false)} />}
     </div>
   );
 }

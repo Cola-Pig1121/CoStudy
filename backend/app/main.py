@@ -83,6 +83,7 @@ async def health() -> dict:
 from app.api import auth_router, resources_router, review_router, textbooks_router  # noqa: E402
 from app.api.ai import router as ai_router  # noqa: E402
 from app.api.providers import router as providers_router  # noqa: E402
+from app.api.upload import router as upload_router  # noqa: E402
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(textbooks_router, prefix=settings.API_V1_PREFIX)
@@ -90,3 +91,4 @@ app.include_router(resources_router, prefix=settings.API_V1_PREFIX)
 app.include_router(review_router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_router, prefix=settings.API_V1_PREFIX)
 app.include_router(providers_router, prefix=settings.API_V1_PREFIX)
+app.include_router(upload_router, prefix=settings.API_V1_PREFIX)
