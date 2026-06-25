@@ -214,9 +214,8 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
         </div>
       </BubbleMenu>
 
-      {/* FloatingMenu: 空行时弹出 */}
+      {/* FloatingMenu: 空行点击时弹出快捷操作 */}
       <FloatingMenu editor={editor}
-        shouldShow={({ editor }) => editor.isActive("paragraph") && editor.getText().trim() === ""}
         options={{ placement: "right-start", offset: 4 }}>
         <div className="flex items-center gap-0.5 bg-white rounded-xl shadow-lg shadow-black/10 border border-gray-100 p-1">
           <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="标题 1">
