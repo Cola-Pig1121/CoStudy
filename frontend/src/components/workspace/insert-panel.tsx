@@ -126,27 +126,60 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
     if (!input.trim()) return;
     setRendering(true);
     try {
-      const renderDiv = document.createElement("div");
-      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:24px 32px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;";
-      document.body.appendChild(renderDiv);
-
       if (mode === "latex") {
-        renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
-        renderDiv.style.fontSize = "28px";
+        // KaTeX → HTML string → SVG data URL（直接，不依赖 DOM 截图）
+        const html = katex.renderToString(input, { throwOnError: false, displayMode: true });
+        // 用 canvas 把 HTML 文字渲染成图片
+        const canvas = document.createElement("canvas");
+        const scale = 3;
+        // 先测量文字尺寸
+        const measureDiv = document.createElement("div");
+        measureDiv.innerHTML = html;
+        measureDiv.style.cssText = "position:fixed;left:-9999px;font-size:28px;font-family:'LXGW WenKai',serif;display:inline-block;";
+        document.body.appendChild(measureDiv);
+        const rect = measureDiv.getBoundingClientRect();
+        canvas.width = Math.max(rect.width * scale, 100);
+        canvas.height = Math.max(rect.height * scale, 60);
+        document.body.removeChild(measureDiv);
+
+        const ctx = canvas.getContext("2d")!;
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width / scale, canvas.height / scale);
+        // 用 foreignObject SVG 方式渲染 KaTeX HTML
+        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width / scale}" height="${canvas.height / scale}">
+          <foreignObject width="100%" height="100%">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:28px;color:#1f2937;padding:4px;display:inline-block;font-family:serif;">${html}</div>
+          </foreignObject>
+        </svg>`;
+        const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        const img = new window.Image();
+        await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = svgUrl; });
+        ctx.drawImage(img, 0, 0, canvas.width / scale, canvas.height / scale);
+        URL.revokeObjectURL(svgUrl);
+        setRenderedImageUrl(canvas.toDataURL("image/png"));
       } else {
+        // Markdown: 用 html-to-image 截取隔离 div
+        const renderDiv = document.createElement("div");
+        renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:650px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
+        document.body.appendChild(renderDiv);
         const { createRoot } = await import("react-dom/client");
         const root = createRoot(renderDiv);
-        root.render(
-          <div style={{ fontSize: "16px", color: "#1f2937", background: "white", padding: "8px", borderRadius: "8px", maxWidth: "600px" }}>
-            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
-          </div>
-        );
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise<void>((resolve) => {
+          root.render(
+            <div style={{ background: "white", padding: "8px", borderRadius: "8px" }}>
+              <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
+            </div>
+          );
+          // 等待 React 渲染 + 浏览器布局 + KaTeX 字体加载
+          setTimeout(resolve, 500);
+        });
+        const dataUrl = await toPng(renderDiv, { pixelRatio: 3, backgroundColor: "white" });
+        root.unmount();
+        document.body.removeChild(renderDiv);
+        setRenderedImageUrl(dataUrl);
       }
-
-      const dataUrl = await toPng(renderDiv, { pixelRatio: 3, backgroundColor: "white" });
-      document.body.removeChild(renderDiv);
-      setRenderedImageUrl(dataUrl);
     } catch (e) {
       console.error("Render failed:", e);
       setRenderedImageUrl(null);
@@ -201,16 +234,14 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
             </div>
           )}
           {renderedImageUrl && !rendering && (
-            <div>
-              <div className="text-[10px] text-gray-400 mb-1.5 flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#4a9d9a]"></span>
-                渲染完成 · 右键下方图片 → 复制图片 → 粘贴到 Excalidraw
+            <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-3 bg-[#4a9d9a]/3">
+              <div className="text-[11px] text-[#4a9d9a] font-medium mb-2 flex items-center gap-1.5">
+                ✅ 渲染完成 · 右键下方图片 → 复制图片 → 粘贴到 Excalidraw
               </div>
               <img
                 src={renderedImageUrl}
-                alt="rendered formula"
-                className="max-w-full rounded-xl border border-gray-100 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                draggable={false}
+                alt="rendered"
+                className="max-w-full rounded-lg bg-white border border-gray-200 shadow-sm"
               />
             </div>
           )}
