@@ -26,7 +26,7 @@ class TextbookNode(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     level: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     parent_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("textbooks.id", ondelete="CASCADE"), nullable=True, index=True
+        Integer, ForeignKey("textbooks.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

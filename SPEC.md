@@ -241,9 +241,6 @@ CoStudy/
 │   │   │   ├── upload_service.py     # MinIO 操作封装
 │   │   │   ├── video_service.py      # 视频上传 + FFmpeg 转码
 │   │   │   └── vector_service.py     # pgvector 向量化 + RAG 检索
-│   │   ├── middleware/               # 中间件
-│   │   │   ├── __init__.py
-│   │   │   ├── auth.py               # JWT 认证中间件
 │   │   │   ├── rate_limit.py         # API 限流 (slowapi)
 │   │   │   └── cors.py               # CORS 配置
 │   │   └── tasks/                    # Celery 异步任务
@@ -302,7 +299,7 @@ CREATE TABLE textbooks (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     level INT NOT NULL,                            -- 0:科目, 1:教材, 2:单元, 3:章节
-    parent_id INT REFERENCES textbooks(id) ON DELETE CASCADE,
+    parent_id INT REFERENCES textbooks(id) ON DELETE RESTRICT,
     sort_order INT DEFAULT 0,                      -- 同级排序
     description TEXT,
     image_urls JSONB DEFAULT '[]',                 -- 课本图片 URL 列表 (MinIO 路径)
@@ -346,7 +343,7 @@ CREATE TABLE shared_resources (
     reject_reason TEXT,                            -- 驳回原因
     favorites_count INT DEFAULT 0,
     view_count INT DEFAULT 0,
-    embedding VECTOR(1536),                        -- pgvector 向量 (用于 RAG)
+    embedding VECTOR(768),                          -- pgvector 向量 (用于 RAG)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -355,7 +352,7 @@ CREATE INDEX idx_resources_textbook ON shared_resources(textbook_id);
 CREATE INDEX idx_resources_user ON shared_resources(user_id);
 CREATE INDEX idx_resources_status ON shared_resources(status);
 CREATE INDEX idx_resources_type ON shared_resources(type);
-CREATE INDEX idx_resources_embedding ON shared_resources USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_resources_embedding ON shared_resources USING ivfflat (embedding vector_cosine_ops) WITH (lists = 50);
 ```
 
 #### 试卷表 (`exam_papers`)
@@ -740,12 +737,31 @@ CREATE INDEX idx_chat_conversation ON chat_messages(conversation_id);
 
 ```
 前端上传试卷图片 → fabric.js 画布展示 → 用户拖拽框选
-  → 生成相对坐标 {x, y, w, h}
+  → 生成相对坐标 (按画布缩放比例换算) {x, y, w, h}
   → POST /api/v1/exams/questions/crop
   → 后端 OpenCV 裁剪 → PaddleOCR 局部识别
   → DeepSeek API 结构化 (Prompt → JSON)
   → SSE 流式返回 → 双栏校对 (左图右文) → 保存入库
 ```
+
+> **⚠️ Canvas 坐标缩放公式 (关键)**
+>
+> 手机拍照分辨率通常极大 (如 4000×3000)，前端 Canvas 会缩放到 ~800×600 展示。
+> 学生在缩放后的画布上拉框，坐标是画布坐标，**必须**转换为原图坐标：
+>
+> ```
+> ratio_x = box.x / canvas_display_width
+> ratio_y = box.y / canvas_display_height
+> ratio_w = box.w / canvas_display_width
+> ratio_h = box.h / canvas_display_height
+>
+> original_box.x = ratio_x * original_image_width
+> original_box.y = ratio_y * original_image_height
+> original_box.w = ratio_w * original_image_width
+> original_box.h = ratio_h * original_image_height
+> ```
+>
+> 后端用 `original_box` 裁剪原图，才能精准切题。
 
 ### 7.2 手写笔记 → DeepSeek Vision → Markdown
 
@@ -759,10 +775,14 @@ CREATE INDEX idx_chat_conversation ON chat_messages(conversation_id);
 ### 7.3 RAG 知识问答管道
 
 ```
-审核通过的资源 → Celery 向量化任务 → pgvector 存储
+审核通过的资源 → Celery 向量化任务 (本地加载 text2vec-base-chinese, 768维)
+  → pgvector 余弦索引存储
   → 学生提问 → 余弦相似度检索 top 3 → 注入 Context
   → DeepSeek API (RAG Prompt) → SSE 流式返回
 ```
+
+> **注意**: DeepSeek 不提供原生 Embedding API。向量化使用 Celery Worker 本地加载
+> `shibing624/text2vec-base-chinese`（768 维，~400MB），避免调用第三方 Embedding 服务。
 
 ### 7.4 费曼学习助手
 
