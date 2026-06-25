@@ -217,11 +217,9 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       {/* FloatingMenu: 空行点击时弹出快捷操作 */}
       <FloatingMenu editor={editor}
         shouldShow={({ editor }) => {
-          // 仅在段落节点且确实为空时显示
           if (!editor.isActive("paragraph")) return false;
-          const { node } = editor.state.selection.$from;
-          // node.textContent 在中文 IME 下比 getText() 更可靠
-          return node.textContent.trim().length === 0;
+          const $from = editor.state.selection.$from;
+          return $from.parent.textContent.trim().length === 0;
         }}
         options={{ placement: "right-start", offset: 4 }}>
         <div className="flex items-center gap-0.5 bg-white rounded-xl shadow-lg shadow-black/10 border border-gray-100 p-1">
