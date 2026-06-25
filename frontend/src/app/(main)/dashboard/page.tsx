@@ -11,15 +11,13 @@ import {
   Layers,
   LogOut,
   Shield,
-  XCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { USER_ROLES } from "@/lib/constants";
 
 const studentNav = [
   { icon: Bookmark, label: "我的收藏", href: "/dashboard/favorites" },
-  { icon: FileEdit, label: "我的草稿", href: "/dashboard/drafts" },
-  { icon: XCircle, label: "审核中", href: "/dashboard/reviewing" },
+  { icon: FileEdit, label: "我的创作", href: "/workspace/drafts" },
   { icon: FileEdit, label: "错题本", href: "/dashboard/errors" },
   { icon: History, label: "测试历史", href: "/dashboard/history" },
 ];

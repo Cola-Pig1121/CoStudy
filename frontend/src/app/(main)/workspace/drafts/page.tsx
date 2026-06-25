@@ -130,7 +130,8 @@ export default function DraftsPage() {
             const TypeIcon = typeInfo.icon;
             return (
               <div key={r.id}
-                className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:shadow-black/[0.04] transition-all group">
+                className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:shadow-black/[0.04] transition-all group cursor-pointer"
+                onClick={() => router.push(`/workspace/drafts/${r.id}`)}>
                 <div className="flex items-start gap-4">
                   {/* 类型图标 */}
                   <div className={`w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0`}>
@@ -163,7 +164,7 @@ export default function DraftsPage() {
                   </div>
 
                   {/* 操作 */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     {r.status === 0 && (
                       <button onClick={() => handleSubmit(r.id)}
                         className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#4a9d9a]/10 text-[#4a9d9a] hover:bg-[#4a9d9a]/20 transition-colors">
