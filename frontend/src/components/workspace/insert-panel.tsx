@@ -12,6 +12,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clipboard,
   Loader2,
   Sigma,
   Type,
@@ -113,51 +114,44 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
   const [input, setInput] = useState("");
   const [rendering, setRendering] = useState(false);
   const [renderedImageUrl, setRenderedImageUrl] = useState<string | null>(null);
+  const [renderedHtml, setRenderedHtml] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  const copySource = async () => {
+    if (!input.trim()) return;
+    try {
+      await navigator.clipboard.writeText(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = input;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const renderToImage = useCallback(async () => {
     if (!input.trim()) return;
     setRendering(true);
-    const t0 = performance.now();
     try {
-      const renderDiv = document.createElement("div");
-      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:16px 24px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;font-size:16px;color:#1f2937;";
-      document.body.appendChild(renderDiv);
-
       if (mode === "latex") {
-        // KaTeX 同步渲染，无需等待
-        renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
+        // 直接渲染 KaTeX HTML 到预览区，不做任何格式转换
+        setRenderedImageUrl(null); // 清除旧图片
+        setRenderedHtml(katex.renderToString(input, { throwOnError: false, displayMode: true }));
       } else {
-        const { createRoot } = await import("react-dom/client");
-        const root = createRoot(renderDiv);
-        root.render(
-          <div style={{ background: "white", padding: "4px", borderRadius: "8px" }}>
-            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
-          </div>
-        );
-        // 只等一帧让 React 提交 DOM
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        // Markdown 也直接渲染 HTML
+        setRenderedImageUrl(null);
+        setRenderedHtml(input);
       }
-
-      // toSvg（不用 canvas，无 CORS/taint 问题）
-      const svgStr = await toSvg(renderDiv, { backgroundColor: "white", fontEmbedCSS: "inline" });
-
-      // 清理
-      if (mode === "markdown") renderDiv.innerHTML = "";
-      document.body.removeChild(renderDiv);
-
-      const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-      // 用 data URL 而非 blob URL，确保 <img> 能渲染 SVG
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(svgBlob);
-      });
-      setRenderedImageUrl(dataUrl);
-      console.log(`Rendered in ${Math.round(performance.now() - t0)}ms`);
     } catch (e) {
       console.error("Render failed:", e);
-      setRenderedImageUrl(null);
     } finally {
       setRendering(false);
     }
@@ -201,25 +195,40 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
             className="w-full h-16 px-3 py-2 text-xs font-mono rounded-xl bg-gray-50 border border-gray-200 outline-none focus:border-[#e8b86d] resize-none" />
         </div>
 
-        {/* 渲染结果图片 */}
+        {/* 渲染结果 */}
         <div className="px-4 pt-2 flex-1 overflow-y-auto">
-          {renderedImageUrl && !rendering && (
-            <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-3 bg-[#4a9d9a]/3">
+          {rendering && (
+            <div className="flex items-center justify-center py-4 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin mr-2 text-[#e8b86d]" />渲染中…
+            </div>
+          )}
+          {renderedHtml && !rendering && (
+            <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-4 bg-[#4a9d9a]/3">
               <div className="text-[11px] text-[#4a9d9a] font-medium mb-2 flex items-center gap-1.5">
-                ✅ 右键下方图片 → 复制图片 → 粘贴到 Excalidraw
+                ✅ 渲染完成 · 右键下方区域截图粘贴到 Excalidraw
               </div>
-              <img src={renderedImageUrl} alt="rendered" className="max-w-full rounded-lg bg-white border border-gray-200 shadow-sm" />
+              <div
+                ref={previewRef}
+                className="rounded-lg bg-white border border-gray-200 shadow-sm p-4 flex items-center justify-center"
+                dangerouslySetInnerHTML={{ __html: renderedHtml }}
+              />
             </div>
           )}
         </div>
 
         {/* 底部按钮 */}
-        <div className="px-4 py-3 mt-auto border-t border-gray-100">
+        <div className="px-4 py-3 mt-auto border-t border-gray-100 flex gap-2">
+          <button onClick={copySource} disabled={!input.trim()}
+            className={cn("flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors border",
+              copied ? "border-[#4a9d9a] bg-[#4a9d9a]/10 text-[#4a9d9a]" : "border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50")}>
+            {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
+            {copied ? "已复制" : "复制源码"}
+          </button>
           <button onClick={renderToImage} disabled={!input.trim() || rendering}
-            className={cn("w-full flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors",
+            className={cn("flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors",
               rendering ? "bg-[#e8b86d]/20 text-[#e8b86d]" : "bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50")}>
             {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sigma className="h-4 w-4" />}
-            {rendering ? "渲染中…" : renderedImageUrl ? "重新生成" : "生成图片"}
+            {rendering ? "渲染中…" : "渲染预览"}
           </button>
         </div>
       </div>
