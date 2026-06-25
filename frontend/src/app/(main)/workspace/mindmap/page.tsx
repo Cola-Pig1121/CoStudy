@@ -152,7 +152,7 @@ export default function MindmapPage() {
               <Image className="h-4 w-4 text-[#e8b86d]" />
               插入公式
             </button>
-            {showInsert && <InsertPanel onClose={() => setShowInsert(false)} />}
+            {showInsert && <InsertPanel onClose={() => setShowInsert(false)} excalidrawAPI={excalidrawAPIRef.current} />}
           </div>
 
           {saved && (

@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { toSvg } from "html-to-image";
+import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import {
   BookOpen,
   Check,
@@ -107,9 +108,13 @@ function RefSection({ section, onInsert }: { section: { label: string; open: boo
   );
 }
 
-interface InsertPanelProps { onClose: () => void; }
+interface InsertPanelProps {
+  onClose: () => void;
+  /** Excalidraw API 引用，用于直接插入元素到画布 */
+  excalidrawAPI?: any;
+}
 
-export function InsertPanel({ onClose }: InsertPanelProps) {
+export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
   const [mode, setMode] = useState<"latex" | "markdown">("latex");
   const [input, setInput] = useState("");
   const [rendering, setRendering] = useState(false);
@@ -125,7 +130,6 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
       const ta = document.createElement("textarea");
       ta.value = input;
       document.body.appendChild(ta);
@@ -134,6 +138,30 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
       document.body.removeChild(ta);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  /** 直接将 LaTeX/Markdown 作为文本元素插入 Excalidraw 画布 */
+  const insertToCanvas = () => {
+    if (!input.trim() || !excalidrawAPI) return;
+    try {
+      const text = mode === "latex" ? `$${input}$` : input;
+      const elements = convertToExcalidrawElements([
+        {
+          type: "text",
+          x: 200,
+          y: 200,
+          text,
+          fontSize: 20,
+          strokeColor: "#1e1e1e",
+        },
+      ]);
+      const current = excalidrawAPI.getSceneElements() ?? [];
+      excalidrawAPI.updateScene({ elements: [...current, ...elements] });
+      onClose();
+    } catch (e) {
+      console.error("Insert to canvas failed:", e);
+      alert("插入失败，请尝试复制源码后手动粘贴");
     }
   };
 
@@ -217,19 +245,28 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
         </div>
 
         {/* 底部按钮 */}
-        <div className="px-4 py-3 mt-auto border-t border-gray-100 flex gap-2">
-          <button onClick={copySource} disabled={!input.trim()}
-            className={cn("flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors border",
-              copied ? "border-[#4a9d9a] bg-[#4a9d9a]/10 text-[#4a9d9a]" : "border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50")}>
-            {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
-            {copied ? "已复制" : "复制源码"}
-          </button>
-          <button onClick={renderToImage} disabled={!input.trim() || rendering}
-            className={cn("flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium transition-colors",
-              rendering ? "bg-[#e8b86d]/20 text-[#e8b86d]" : "bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50")}>
-            {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sigma className="h-4 w-4" />}
-            {rendering ? "渲染中…" : "渲染预览"}
-          </button>
+        <div className="px-4 py-3 mt-auto border-t border-gray-100 space-y-2">
+          {excalidrawAPI && (
+            <button onClick={insertToCanvas} disabled={!input.trim()}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm rounded-xl font-medium bg-[#4a9d9a] text-white hover:bg-[#4a9d9a]/90 disabled:opacity-50 transition-colors">
+              <Sigma className="h-4 w-4" />
+              插入到画布
+            </button>
+          )}
+          <div className="flex gap-2">
+            <button onClick={copySource} disabled={!input.trim()}
+              className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl font-medium transition-colors border",
+                copied ? "border-[#4a9d9a] bg-[#4a9d9a]/10 text-[#4a9d9a]" : "border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50")}>
+              {copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
+              {copied ? "已复制" : "复制源码"}
+            </button>
+            <button onClick={renderToImage} disabled={!input.trim() || rendering}
+              className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl font-medium transition-colors",
+                rendering ? "bg-[#e8b86d]/20 text-[#e8b86d]" : "bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50")}>
+              {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sigma className="h-4 w-4" />}
+              {rendering ? "渲染中…" : "渲染预览"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
