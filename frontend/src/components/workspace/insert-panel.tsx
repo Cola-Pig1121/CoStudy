@@ -178,75 +178,43 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
     if (!previewRef.current || !input.trim()) return;
     setCopying(true);
     try {
-      // 1. html-to-image → data URL
+      // html-to-image → data URL → 打开新窗口展示图片
       const dataUrl = await toPng(previewRef.current, {
-        pixelRatio: 2,
+        pixelRatio: 3,
         backgroundColor: "white",
-        style: { padding: "16px", borderRadius: "8px" },
+        style: { padding: "24px", borderRadius: "8px" },
       });
 
-      // 2. data URL → blob → File
-      const resp = await fetch(dataUrl);
-      const blob = await resp.blob();
-      const file = new File([blob], mode === "latex" ? "formula.png" : "markdown.png", { type: "image/png" });
-
-      // 3. 方法 A: 模拟 Excalidraw 的 paste 事件（最可靠）
-      if (excalidrawAPI) {
-        try {
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          // 找到 Excalidraw 的容器 DOM
-          const container = document.querySelector(".excalidraw") as HTMLElement;
-          if (container) {
-            const pasteEvent = new ClipboardEvent("paste", {
-              clipboardData: dt,
-              bubbles: true,
-              cancelable: true,
-            });
-            container.dispatchEvent(pasteEvent);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-            onClose();
-            return;
-          }
-        } catch (e) {
-          console.warn("Excalidraw paste failed, trying clipboard:", e);
-        }
+      // 打开新窗口展示渲染结果
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${mode === "latex" ? "LaTeX 公式" : "Markdown"} - CoStudy</title>
+            <style>
+              body { margin: 0; display: flex; justify-content: center; align-items: center;
+                     min-height: 100vh; background: #f5f5f5; font-family: sans-serif; }
+              img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+              .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                      background: rgba(0,0,0,0.7); color: white; padding: 8px 20px; border-radius: 20px;
+                      font-size: 13px; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" alt="rendered" />
+            <div class="hint">右键图片 → 复制图片 → 回到 Excalidraw 粘贴</div>
+          </body>
+          </html>
+        `);
+        newWindow.document.close();
       }
 
-      // 4. 方法 B: Clipboard API (HTTPS/localhost)
-      try {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob }),
-        ]);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        return;
-      } catch {}
-
-      // 5. 方法 C: Selection API fallback
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.src = dataUrl;
-      await new Promise<void>((r) => { img.onload = () => r(); });
-      const tempImg = document.createElement("img");
-      tempImg.src = dataUrl;
-      tempImg.style.position = "fixed";
-      tempImg.style.left = "-9999px";
-      document.body.appendChild(tempImg);
-      await new Promise((r) => setTimeout(r, 100));
-      const range = document.createRange();
-      range.selectNode(tempImg);
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-      document.execCommand("copy");
-      sel?.removeAllRanges();
-      document.body.removeChild(tempImg);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      console.error("Insert failed:", e);
+      console.error("Render failed:", e);
     } finally {
       setCopying(false);
     }
@@ -328,7 +296,7 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
             className={cn("w-full flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl font-medium transition-colors",
               copied ? "bg-[#4a9d9a]/10 text-[#4a9d9a]" : "bg-[#4a9d9a] text-white hover:bg-[#4a9d9a]/90 disabled:opacity-50")}>
             {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "已插入画布" : excalidrawAPI ? "插入到画布" : "复制图片"}
+            {copied ? "已打开新窗口" : "渲染并打开"}
           </button>
         </div>
       </div>
