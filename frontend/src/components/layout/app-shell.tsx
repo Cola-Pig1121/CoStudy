@@ -1,23 +1,27 @@
 "use client";
 
 import { Sidebar } from "./sidebar";
+import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { TopHeader } from "./top-header";
 
-interface AppShellProps {
-  children: React.ReactNode;
-}
+function AppShellInner({ children }: { children: React.ReactNode }) {
+  const { width } = useSidebar();
 
-/**
- * 全局布局壳：左侧 Sidebar (240px) + 右侧 (TopHeader + Content)。
- */
-export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-[#faf8f5]">
       <Sidebar />
-      <div className="pl-[240px]">
+      <div className="transition-all duration-300" style={{ paddingLeft: width }}>
         <TopHeader />
         <main className="min-h-[calc(100vh-64px)]">{children}</main>
       </div>
     </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </SidebarProvider>
   );
 }

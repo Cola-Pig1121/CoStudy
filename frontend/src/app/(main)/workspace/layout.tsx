@@ -50,8 +50,8 @@ export default function WorkspaceLayout({
         </div>
       </div>
 
-      {/* 内容区 */}
-      <div className="flex-1">{children}</div>
+      {/* 内容区 - 减去 AppShell Header 64px + TabBar ~50px */}
+      <div className="h-[calc(100vh-64px-50px)]">{children}</div>
     </div>
   );
 }

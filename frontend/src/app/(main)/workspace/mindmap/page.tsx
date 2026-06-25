@@ -1,41 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  BookOpen,
-  Eye,
-  Loader2,
-  Pencil,
-  Save,
-  Send,
-  Sparkles,
-} from "lucide-react";
-import Markdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import dynamic from "next/dynamic";
+import { ArrowLeft, BookOpen, Loader2, Save, Send, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import type { TextbookNode } from "@/types";
+import type { ExcalidrawAPI } from "@/components/workspace/excalidraw-editor";
 
-export default function NotesPage() {
+// Excalidraw 仅客户端渲染
+const ExcalidrawWrapper = dynamic(
+  () => import("@/components/workspace/excalidraw-editor").then((m) => m.ExcalidrawEditor),
+  { ssr: false, loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="h-8 w-8 animate-spin text-[#4a9d9a]" />
+    </div>
+  ) }
+);
+
+export default function MindmapPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("# 知识笔记\n\n在这里编写你的笔记...\n\n支持 **Markdown** 和 $LaTeX$ 公式。\n\n## 示例\n\n- 列表项 1\n- 列表项 2\n\n$$E = mc^2$$\n");
-  const [preview, setPreview] = useState(false);
   const [textbookId, setTextbookId] = useState<number | null>(null);
   const [textbooks, setTextbooks] = useState<TextbookNode[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTree, setShowTree] = useState(false);
+  const excalidrawAPIRef = useRef<ExcalidrawAPI | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
 
+  // 加载教材树（用于选择挂载节点）
   useEffect(() => {
     if (!user) return;
     api.get<TextbookNode[]>("/api/v1/textbooks/tree").then(setTextbooks).catch(() => {});
@@ -45,15 +44,22 @@ export default function NotesPage() {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const resource = await api.post<{ id: number }>("/api/v1/resources", {
+      const elements = excalidrawAPIRef.current?.getSceneElements() ?? [];
+      const content = JSON.stringify({ elements, appState: { viewBackgroundColor: "#ffffff" } });
+
+      const body = {
         title: title.trim(),
-        type: "markdown",
+        type: "excalidraw" as const,
         textbook_id: textbookId,
         content,
-      });
+      };
+
+      const resource = await api.post<{ id: number }>("/api/v1/resources", body);
+
       if (!asDraft) {
         await api.post(`/api/v1/resources/${resource.id}/submit`, {});
       }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
@@ -61,29 +67,30 @@ export default function NotesPage() {
     } finally {
       setSaving(false);
     }
-  }, [title, content, textbookId]);
+  }, [title, textbookId]);
 
+  // 展平教材树供选择
   const flatNodes = textbooks.flatMap(function flatten(n: TextbookNode): TextbookNode[] {
     return [n, ...(n.children?.flatMap(flatten) ?? [])];
   });
 
   if (loading || !user) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-56px)]">
+      <div className="flex items-center justify-center h-full">
         <Loader2 className="h-6 w-6 animate-spin text-[#4a9d9a]" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)]">
+    <div className="flex flex-col h-full">
       {/* 工具栏 */}
       <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-gray-100">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="笔记标题..."
+          placeholder="思维导图标题..."
           className="flex-1 text-lg font-medium text-gray-800 placeholder:text-gray-300 bg-transparent border-none outline-none"
         />
 
@@ -91,9 +98,9 @@ export default function NotesPage() {
         <div className="relative">
           <button
             onClick={() => setShowTree((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#e8b86d]/40 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#4a9d9a]/40 transition-colors"
           >
-            <BookOpen className="h-4 w-4 text-[#e8b86d]" />
+            <BookOpen className="h-4 w-4 text-[#4a9d9a]" />
             {textbookId
               ? flatNodes.find((n) => n.id === textbookId)?.name ?? "已选择"
               : "挂载到教材"}
@@ -113,10 +120,9 @@ export default function NotesPage() {
                 <button
                   key={n.id}
                   onClick={() => { setTextbookId(n.id); setShowTree(false); }}
-                  className={cn(
-                    "w-full text-left px-2 py-1.5 text-sm rounded-lg hover:bg-[#e8b86d]/10 transition-colors",
-                    textbookId === n.id ? "bg-[#e8b86d]/10 text-[#e8b86d] font-medium" : "text-gray-700"
-                  )}
+                  className={`w-full text-left px-2 py-1.5 text-sm rounded-lg hover:bg-[#4a9d9a]/10 transition-colors ${
+                    textbookId === n.id ? "bg-[#4a9d9a]/10 text-[#4a9d9a] font-medium" : "text-gray-700"
+                  }`}
                   style={{ paddingLeft: `${12 + n.level * 16}px` }}
                 >
                   {n.name}
@@ -126,23 +132,9 @@ export default function NotesPage() {
           )}
         </div>
 
-        {/* 编辑/预览切换 */}
-        <button
-          onClick={() => setPreview((v) => !v)}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors",
-            preview
-              ? "bg-[#e8b86d]/10 text-[#e8b86d]"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          )}
-        >
-          {preview ? <Eye className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-          {preview ? "预览中" : "编辑"}
-        </button>
-
         <div className="flex items-center gap-2">
           {saved && (
-            <span className="text-xs text-[#e8b86d] flex items-center gap-1">
+            <span className="text-xs text-[#4a9d9a] flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> 已保存
             </span>
           )}
@@ -157,7 +149,7 @@ export default function NotesPage() {
           <button
             onClick={() => handleSave(false)}
             disabled={saving || !title.trim()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[#4a9d9a] text-white hover:bg-[#4a9d9a]/90 disabled:opacity-50 transition-colors"
           >
             <Send className="h-4 w-4" />
             提交审核
@@ -165,22 +157,9 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* 编辑器/预览区 */}
-      <div className="flex-1 flex overflow-hidden">
-        {preview ? (
-          <div className="flex-1 overflow-y-auto px-12 py-8 prose prose-gray max-w-3xl mx-auto">
-            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {content}
-            </Markdown>
-          </div>
-        ) : (
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="flex-1 resize-none p-8 text-gray-800 font-mono text-sm leading-relaxed bg-transparent border-none outline-none"
-            placeholder="用 Markdown 编写笔记..."
-          />
-        )}
+      {/* Excalidraw 画布 */}
+      <div className="flex-1 relative">
+        <ExcalidrawWrapper onAPIReady={(api) => { excalidrawAPIRef.current = api; }} />
       </div>
     </div>
   );
