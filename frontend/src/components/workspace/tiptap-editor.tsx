@@ -272,9 +272,8 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       Iframe,
       Mathematics.configure({
         inlineOptions: {
-          onClick: (_node: any, pos: number) => {
-            // 单击已渲染的行内公式 → 打开 prompt 编辑 LaTeX
-            const current = editorRef.current?.getAttributesAt(pos, "inline-math")?.latex ?? "";
+          onClick: (node: any, pos: number) => {
+            const current = node?.attrs?.latex ?? "";
             const latex = prompt("编辑 LaTeX 公式：", current);
             if (latex !== null && latex.trim()) {
               editorRef.current?.chain().setNodeSelection(pos).updateInlineMath({ latex: latex.trim() }).focus().run();
@@ -282,8 +281,8 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
           },
         },
         blockOptions: {
-          onClick: (_node: any, pos: number) => {
-            const current = editorRef.current?.getAttributesAt(pos, "block-math")?.latex ?? "";
+          onClick: (node: any, pos: number) => {
+            const current = node?.attrs?.latex ?? "";
             const latex = prompt("编辑 LaTeX 公式：", current);
             if (latex !== null && latex.trim()) {
               editorRef.current?.chain().setNodeSelection(pos).updateBlockMath({ latex: latex.trim() }).focus().run();
