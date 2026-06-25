@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css";
 
 /** Excalidraw 命令式 API（精简类型） */
 export interface ExcalidrawAPI {
