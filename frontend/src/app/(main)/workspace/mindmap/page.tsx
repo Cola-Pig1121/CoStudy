@@ -45,7 +45,15 @@ export default function MindmapPage() {
     setSaving(true);
     try {
       const elements = excalidrawAPIRef.current?.getSceneElements() ?? [];
-      const content = JSON.stringify({ elements, appState: { viewBackgroundColor: "#ffffff" } });
+      const content = JSON.stringify({
+        elements,
+        appState: {
+          viewBackgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0,
+          zoom: { value: 1 },
+        },
+      });
 
       const body = {
         title: title.trim(),

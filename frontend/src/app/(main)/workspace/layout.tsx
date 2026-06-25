@@ -20,7 +20,7 @@ export default function WorkspaceLayout({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-full bg-[#faf8f5] flex flex-col">
+    <div className="h-full bg-[#faf8f5] flex flex-col">
       {/* 标签栏 */}
       <div className="bg-white border-b border-gray-100 px-6">
         <div className="mx-auto max-w-6xl flex items-center gap-1">
@@ -52,7 +52,7 @@ export default function WorkspaceLayout({
       </div>
 
       {/* 内容区 - 减去 AppShell Header 64px + TabBar ~50px */}
-      <div className="flex-1 overflow-y-auto">{children}</div>
+      <div className="flex-1 min-h-0">{children}</div>
     </div>
   );
 }

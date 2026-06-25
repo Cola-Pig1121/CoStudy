@@ -68,7 +68,11 @@ export default function DraftDetailPage() {
     if (!content || resource?.type !== "excalidraw") return undefined;
     try {
       const data = JSON.parse(content);
-      return { elements: data.elements ?? [], appState: data.appState ?? {} };
+      // 重置视角：确保内容居中可见，不沿用旧的 scrollX/scrollY
+      return {
+        elements: data.elements ?? [],
+        appState: { ...data.appState, scrollX: 0, scrollY: 0, zoom: { value: 1 }, viewBackgroundColor: "#ffffff" },
+      };
     } catch {
       return undefined;
     }
@@ -86,7 +90,10 @@ export default function DraftDetailPage() {
       let finalContent = content;
       if (resource?.type === "excalidraw" && excalidrawAPIRef.current) {
         const elements = excalidrawAPIRef.current.getSceneElements();
-        finalContent = JSON.stringify({ elements, appState: { viewBackgroundColor: "#ffffff" } });
+        finalContent = JSON.stringify({
+          elements,
+          appState: { viewBackgroundColor: "#ffffff", scrollX: 0, scrollY: 0, zoom: { value: 1 } },
+        });
       }
       await api.put(`/api/v1/resources/${resourceId}`, {
         title: title.trim(),
