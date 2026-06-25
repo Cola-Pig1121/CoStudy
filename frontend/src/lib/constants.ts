@@ -38,11 +38,11 @@ export const USER_ROLES = {
 
 /** 侧边栏导航项 */
 export const NAV_ITEMS = [
-  { id: "home", label: "首页", href: "/" },
-  { id: "tree", label: "教材知识树", href: "/tree" },
-  { id: "workspace", label: "创作工作台", href: "/workspace/mindmap" },
-  { id: "exam", label: "试卷库", href: "/exam" },
-  { id: "video", label: "微课视频", href: "/video" },
-  { id: "ai", label: "AI 助手", href: "/ai" },
-  { id: "dashboard", label: "用户中心", href: "/dashboard" },
+  { id: "home", label: "首页", href: "/", icon: "Home" },
+  { id: "discover", label: "发现", href: "/discover", icon: "Compass", disabled: true },
+  { id: "learn", label: "学习", href: "/learn", icon: "GraduationCap", disabled: true },
+  { id: "tree", label: "知识树", href: "/tree", icon: "Layers" },
+  { id: "workspace", label: "创作", href: "/workspace/mindmap", icon: "Pencil" },
+  { id: "ai", label: "AI 助手", href: "/ai", icon: "Sparkles", disabled: true },
+  { id: "dashboard", label: "个人中心", href: "/dashboard", icon: "Settings" },
 ] as const;
