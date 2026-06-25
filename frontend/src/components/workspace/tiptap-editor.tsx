@@ -6,7 +6,7 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
-import Mathematics from "@tiptap/extension-mathematics";
+import Mathematics, { migrateMathStrings } from "@tiptap/extension-mathematics";
 import {
   Bold,
   Code,
@@ -126,7 +126,7 @@ function LaTeXPanel({ editor, onClose }: { editor: any; onClose: () => void }) {
   const [search, setSearch] = useState("");
 
   const insert = (latex: string) => {
-    editor.chain().focus().insertContent(`$${latex}$`).run();
+    editor.chain().focus().insertInlineMath({ latex }).run();
     onClose();
   };
 
@@ -265,7 +265,12 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
       StarterKit,
       Placeholder.configure({ placeholder: placeholder ?? "开始编写笔记…" }),
       Image.configure({ inline: true, allowBase64: true }),
-      Mathematics,
+      Mathematics.configure({
+        katexOptions: {
+          throwOnError: false,
+          macros: { "\\R": "\\mathbb{R}", "\\N": "\\mathbb{N}" },
+        },
+      }),
     ],
     content,
     editorProps: {
@@ -278,6 +283,10 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
           return false;
         },
       },
+    },
+    onCreate: ({ editor }) => {
+      // 将已有 $...$ 文本迁移为 Math 节点
+      migrateMathStrings(editor);
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
@@ -319,13 +328,11 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
             const sel = editor.state.selection;
             if (sel.from !== sel.to) {
               const text = editor.state.doc.textBetween(sel.from, sel.to);
-              editor.chain().focus().deleteRange(sel).insertContent(`$${text}$`).run();
+              editor.chain().focus().deleteRange(sel).insertInlineMath({ latex: text }).run();
             } else {
-              const pos = sel.from;
-              editor.chain().focus().insertContent("$$")
-                .setTextSelection({ from: pos + 1, to: pos + 1 }).run();
+              editor.chain().focus().insertInlineMath({ latex: "\\cdot" }).run();
             }
-          }} active={editor.isActive("code")} title="插入数学公式 (单行 $...$)">
+          }} title="插入数学公式">
             <Sigma className="h-4 w-4" />
           </Btn>
         </div>
