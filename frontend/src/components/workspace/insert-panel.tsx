@@ -162,9 +162,11 @@ function RefSection({ section, onInsert }: { section: { label: string; open: boo
 
 interface InsertPanelProps {
   onClose: () => void;
+  /** 如果提供，则直接插入到 Excalidraw 画布（跳过剪贴板） */
+  excalidrawAPI?: any;
 }
 
-export function InsertPanel({ onClose }: InsertPanelProps) {
+export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
   const [mode, setMode] = useState<"latex" | "markdown">("latex");
   const [input, setInput] = useState("");
   const [copying, setCopying] = useState(false);
@@ -183,62 +185,68 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
         style: { padding: "16px", borderRadius: "8px" },
       });
 
-      // 2. data URL → canvas → blob
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-        img.src = dataUrl;
-      });
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0);
+      // 2. data URL → blob → File
+      const resp = await fetch(dataUrl);
+      const blob = await resp.blob();
+      const file = new File([blob], mode === "latex" ? "formula.png" : "markdown.png", { type: "image/png" });
 
-      // 3. 尝试 Clipboard API (HTTPS/localhost)
-      let copied = false;
+      // 3. 方法 A: 模拟 Excalidraw 的 paste 事件（最可靠）
+      if (excalidrawAPI) {
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          // 找到 Excalidraw 的容器 DOM
+          const container = document.querySelector(".excalidraw") as HTMLElement;
+          if (container) {
+            const pasteEvent = new ClipboardEvent("paste", {
+              clipboardData: dt,
+              bubbles: true,
+              cancelable: true,
+            });
+            container.dispatchEvent(pasteEvent);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+            onClose();
+            return;
+          }
+        } catch (e) {
+          console.warn("Excalidraw paste failed, trying clipboard:", e);
+        }
+      }
+
+      // 4. 方法 B: Clipboard API (HTTPS/localhost)
       try {
-        const blob = await new Promise<Blob>((resolve) =>
-          canvas.toBlob((b) => resolve(b!), "image/png")
-        );
         await navigator.clipboard.write([
           new ClipboardItem({ "image/png": blob }),
         ]);
-        copied = true;
-      } catch {
-        // Clipboard API 不可用 (HTTP 非 localhost)
-      }
-
-      // 4. fallback: 用 Selection API + execCommand 复制
-      if (!copied) {
-        const tempImg = document.createElement("img");
-        tempImg.src = dataUrl;
-        tempImg.style.position = "fixed";
-        tempImg.style.left = "-9999px";
-        tempImg.style.top = "0";
-        tempImg.style.maxWidth = "600px";
-        document.body.appendChild(tempImg);
-        // 等待图片加载
-        await new Promise((r) => setTimeout(r, 100));
-        const range = document.createRange();
-        range.selectNode(tempImg);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-        document.execCommand("copy");
-        sel?.removeAllRanges();
-        document.body.removeChild(tempImg);
-        copied = true;
-      }
-
-      if (copied) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      }
+        return;
+      } catch {}
+
+      // 5. 方法 C: Selection API fallback
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.src = dataUrl;
+      await new Promise<void>((r) => { img.onload = () => r(); });
+      const tempImg = document.createElement("img");
+      tempImg.src = dataUrl;
+      tempImg.style.position = "fixed";
+      tempImg.style.left = "-9999px";
+      document.body.appendChild(tempImg);
+      await new Promise((r) => setTimeout(r, 100));
+      const range = document.createRange();
+      range.selectNode(tempImg);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.execCommand("copy");
+      sel?.removeAllRanges();
+      document.body.removeChild(tempImg);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      console.error("Copy failed:", e);
+      console.error("Insert failed:", e);
     } finally {
       setCopying(false);
     }
@@ -320,7 +328,7 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
             className={cn("w-full flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl font-medium transition-colors",
               copied ? "bg-[#4a9d9a]/10 text-[#4a9d9a]" : "bg-[#4a9d9a] text-white hover:bg-[#4a9d9a]/90 disabled:opacity-50")}>
             {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "已复制，去 Excalidraw 粘贴" : "复制图片"}
+            {copied ? "已插入画布" : excalidrawAPI ? "插入到画布" : "复制图片"}
           </button>
         </div>
       </div>
