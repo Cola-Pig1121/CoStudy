@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import katex from "katex";
 import Markdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -175,48 +175,73 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
   const previewRef = useRef<HTMLDivElement>(null);
 
   const renderToClipboard = async () => {
-    if (!previewRef.current || !input.trim()) return;
+    if (!input.trim()) return;
     setCopying(true);
     try {
-      // html-to-image → data URL → 打开新窗口展示图片
-      const dataUrl = await toPng(previewRef.current, {
-        pixelRatio: 3,
-        backgroundColor: "white",
-        style: { padding: "24px", borderRadius: "8px" },
-      });
+      // 创建一个隔离的隐藏 div 来渲染（避免 Excalidraw canvas 干扰）
+      const renderDiv = document.createElement("div");
+      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:24px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;";
+      document.body.appendChild(renderDiv);
 
-      // 打开新窗口展示渲染结果
-      const newWindow = window.open("", "_blank");
-      if (newWindow) {
-        newWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>${mode === "latex" ? "LaTeX 公式" : "Markdown"} - CoStudy</title>
-            <style>
-              body { margin: 0; display: flex; justify-content: center; align-items: center;
-                     min-height: 100vh; background: #f5f5f5; font-family: sans-serif; }
-              img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
-              .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-                      background: rgba(0,0,0,0.7); color: white; padding: 8px 20px; border-radius: 20px;
-                      font-size: 13px; }
-            </style>
-          </head>
-          <body>
-            <img src="${dataUrl}" alt="rendered" />
-            <div class="hint">右键图片 → 复制图片 → 回到 Excalidraw 粘贴</div>
-          </body>
-          </html>
-        `);
-        newWindow.document.close();
+      if (mode === "latex") {
+        renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
+        renderDiv.style.fontSize = "24px";
+      } else {
+        // Markdown: 用 react-markdown 渲染的 HTML
+        // 创建一个临时 React root
+        const { createRoot } = await import("react-dom/client");
+        const root = createRoot(renderDiv);
+        root.render(
+          <div style={{ fontSize: "16px", color: "#1f2937", background: "white", padding: "12px", borderRadius: "8px", maxWidth: "600px" }}>
+            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
+          </div>
+        );
+        // 等待 React 渲染 + KaTeX 加载字体
+        await new Promise((r) => setTimeout(r, 200));
       }
 
+      // 从隔离 div 截图
+      const dataUrl = await toPng(renderDiv, {
+        pixelRatio: 3,
+        backgroundColor: "white",
+      });
+
+      // 清理
+      document.body.removeChild(renderDiv);
+
+      // 打开新窗口
+      openImageInTab(dataUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
       console.error("Render failed:", e);
     } finally {
       setCopying(false);
+    }
+  };
+
+  const openImageInTab = (dataUrl: string) => {
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${mode === "latex" ? "LaTeX 公式" : "Markdown"} - CoStudy</title>
+          <style>
+            body { margin:0; display:flex; justify-content:center; align-items:center;
+                   min-height:100vh; background:#f5f5f5; }
+            img { max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.1); }
+            .hint { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+                    background:rgba(0,0,0,0.7); color:white; padding:8px 20px; border-radius:20px; font-size:13px; }
+          </style>
+        </head>
+        <body>
+          <img src="${dataUrl}" alt="rendered" />
+          <div class="hint">右键图片 → 复制图片 → 回到 Excalidraw 粘贴</div>
+        </body>
+        </html>`);
+      newWindow.document.close();
     }
   };
 
