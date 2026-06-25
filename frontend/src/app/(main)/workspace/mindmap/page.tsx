@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft, BookOpen, Loader2, Save, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, Loader2, Save, Send, Sparkles, Image } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import type { TextbookNode } from "@/types";
 import type { ExcalidrawAPI } from "@/components/workspace/excalidraw-editor";
+import { InsertPanel } from "@/components/workspace/insert-panel";
 
 // Excalidraw 仅客户端渲染
 const ExcalidrawWrapper = dynamic(
@@ -28,6 +29,7 @@ export default function MindmapPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTree, setShowTree] = useState(false);
+  const [showInsert, setShowInsert] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPI | null>(null);
 
   useEffect(() => {
@@ -140,7 +142,19 @@ export default function MindmapPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
+          {/* 插入公式/Markdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowInsert((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#e8b86d]/40 hover:bg-[#e8b86d]/5 transition-colors"
+            >
+              <Image className="h-4 w-4 text-[#e8b86d]" />
+              插入公式
+            </button>
+            {showInsert && <InsertPanel onClose={() => setShowInsert(false)} />}
+          </div>
+
           {saved && (
             <span className="text-xs text-[#4a9d9a] flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> 已保存
