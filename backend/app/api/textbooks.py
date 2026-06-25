@@ -1,8 +1,13 @@
-"""教材树 API 路由：浏览树、节点详情、管理员 CRUD。"""
-from fastapi import APIRouter, HTTPException, status
+"""教材树 API 路由：浏览树、节点详情、管理员 CRUD、图片上传。"""
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
-from app.dependencies import CurrentUser, DbSession, RequireAdmin
+from app.dependencies import CurrentUser, DbSession, RequireAdmin, RequireTeacher
 from app.models import TextbookNode
 from app.schemas import (
     TextbookChildrenResponse,
@@ -17,6 +22,10 @@ from app.services.textbook_service import (
 )
 
 router = APIRouter(prefix="/textbooks", tags=["textbooks"])
+
+# 图片上传目录
+UPLOAD_DIR = Path("/srv/CoStudy/uploads/textbook_images")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/tree")
@@ -119,3 +128,48 @@ async def list_roots(db: DbSession, user: CurrentUser) -> list[dict]:
         }
         for n in result.scalars().all()
     ]
+
+
+@router.post("/{node_id}/images", response_model=TextbookNodeResponse)
+async def upload_image(
+    node_id: int, file: UploadFile = File(...), db: DbSession = None, admin: RequireAdmin = None
+) -> TextbookNodeResponse:
+    """上传课本图片到指定节点（管理员）。"""
+    if db is None or admin is None:
+        raise HTTPException(status_code=500, detail="依赖注入失败")
+    node = await db.get(TextbookNode, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="节点不存在")
+
+    # 校验文件类型
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="仅支持 JPG/PNG/WebP/GIF 格式")
+
+    # 保存文件
+    ext = file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = UPLOAD_DIR / filename
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB 限制
+        raise HTTPException(status_code=400, detail="图片大小不能超过 10MB")
+    filepath.write_bytes(content)
+
+    # 追加到 image_urls
+    url = f"/api/v1/textbook-images/{filename}"
+    current_urls = list(node.image_urls or [])
+    current_urls.append(url)
+    node.image_urls = current_urls
+    await db.commit()
+    await db.refresh(node)
+    await invalidate_tree_cache()
+    return TextbookNodeResponse.model_validate(node)
+
+
+@router.get("/images/{filename}")
+async def serve_image(filename: str):
+    """直接返回课本图片文件。"""
+    filepath = UPLOAD_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="图片不存在")
+    return FileResponse(filepath, media_type="image/jpeg")
