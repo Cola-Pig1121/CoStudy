@@ -1,5 +1,10 @@
-"""认证 API 路由：注册、登录、刷新、当前用户、更新资料。"""
-from fastapi import APIRouter, HTTPException, status
+"""认证 API 路由：注册、登录、刷新、当前用户、更新资料、修改密码、头像上传。"""
+import os
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 
@@ -118,3 +123,57 @@ async def update_profile(payload: UserUpdate, user: CurrentUser, db: DbSession):
     await db.commit()
     await db.refresh(user)
     return user
+
+
+# ── 修改密码 ──
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+@router.put("/password")
+async def change_password(payload: ChangePasswordRequest, user: CurrentUser, db: DbSession):
+    """修改密码。"""
+    from app.services.auth_service import verify_password, hash_password
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="当前密码不正确")
+    user.password_hash = hash_password(payload.new_password)
+    await db.commit()
+    return {"message": "密码修改成功"}
+
+
+# ── 头像上传 ──
+
+AVATAR_DIR = Path("uploads/avatars")
+AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.post("/avatar")
+async def upload_avatar(file: UploadFile = File(...), user: CurrentUser = None, db: DbSession = None):
+    """上传并更新用户头像。"""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="仅支持图片文件")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="头像大小不能超过 5MB")
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+    filename = f"{user.id}_{uuid.uuid4().hex}.{ext}"
+    filepath = AVATAR_DIR / filename
+    filepath.write_bytes(content)
+    url = f"/api/v1/auth/avatars/{filename}"
+    user.avatar_url = url
+    await db.commit()
+    await db.refresh(user)
+    return {"avatar_url": url}
+
+
+@router.get("/avatars/{filename}")
+async def serve_avatar(filename: str):
+    """返回头像文件。"""
+    from fastapi.responses import FileResponse
+    filepath = AVATAR_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="头像不存在")
+    return FileResponse(filepath, media_type="image/jpeg")

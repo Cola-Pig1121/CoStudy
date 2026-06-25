@@ -68,6 +68,12 @@ export default function DashboardPage() {
               </div>
               <p className="text-xs text-gray-400 mt-1">{user.email}</p>
             </div>
+            <Link
+              href="/dashboard/profile"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#4a9d9a] transition-colors"
+            >
+              个人设置
+            </Link>
             <button
               onClick={() => {
                 logout();
