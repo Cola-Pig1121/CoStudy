@@ -12,14 +12,11 @@ import {
   Send,
   Sparkles,
 } from "lucide-react";
-import Markdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import type { TextbookNode, SharedResource } from "@/types";
 import type { ExcalidrawAPI } from "@/components/workspace/excalidraw-editor";
+import { TipTapEditor } from "@/components/workspace/tiptap-editor";
 
 const ExcalidrawWrapper = dynamic(
   () => import("@/components/workspace/excalidraw-editor").then((m) => m.ExcalidrawEditor),
@@ -50,25 +47,23 @@ export default function DraftDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTree, setShowTree] = useState(false);
-  const [preview, setPreview] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPI | null>(null);
 
   useEffect(() => { if (!loading && !user) router.replace("/login"); }, [user, loading, router]);
 
-  // 加载资源详情
   useEffect(() => {
     if (!user || !resourceId) return;
     api.get<SharedResource & { content?: string; reject_reason?: string }>(`/api/v1/resources/${resourceId}`)
       .then((data) => {
         setResource(data);
         setTitle(data.title);
-        setContent(data.content ?? "");
+        // markdown content from backend is HTML
+        setContent(data.content ?? "<p></p>");
         setTextbookId(data.textbook_id ?? null);
       })
-      .catch(() => router.replace("/workspace/drafts"));
+      .catch(() => router.replace("/workspace/creatures"));
   }, [user, resourceId, router]);
 
-  // 加载教材树
   useEffect(() => {
     if (!user) return;
     api.get<TextbookNode[]>("/api/v1/textbooks/tree").then(setTextbooks).catch(() => {});
@@ -123,14 +118,13 @@ export default function DraftDetailPage() {
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* 工具栏 */}
       <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-gray-100 shrink-0">
-        <Link href="/workspace/drafts" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+        <Link href="/workspace/creatures" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
           className="flex-1 text-lg font-medium text-gray-800 placeholder:text-gray-300 bg-transparent border-none outline-none" />
         <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
 
-        {/* 教材选择 */}
         <div className="relative">
           <button onClick={() => setShowTree((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#4a9d9a]/40 transition-colors">
@@ -155,7 +149,6 @@ export default function DraftDetailPage() {
           )}
         </div>
 
-        {/* 操作按钮 */}
         <div className="flex items-center gap-2">
           {saved && (
             <span className="text-xs text-[#4a9d9a] flex items-center gap-1"><Sparkles className="h-3 w-3" /> 已保存</span>
@@ -181,7 +174,6 @@ export default function DraftDetailPage() {
         {isExcalidraw ? (
           <ExcalidrawWrapper onAPIReady={(api) => {
             excalidrawAPIRef.current = api;
-            // 加载已有内容
             if (content) {
               try {
                 const data = JSON.parse(content);
@@ -190,26 +182,7 @@ export default function DraftDetailPage() {
             }
           }} />
         ) : (
-          <div className="h-full flex overflow-hidden">
-            {/* 编辑/预览切换 */}
-            <div className="w-full flex flex-col">
-              <div className="flex items-center gap-2 px-6 py-2 border-b border-gray-100 bg-white shrink-0">
-                <button onClick={() => setPreview(false)}
-                  className={`px-3 py-1 rounded-lg text-sm ${!preview ? "bg-gray-100 font-medium" : "text-gray-500"}`}>编辑</button>
-                <button onClick={() => setPreview(true)}
-                  className={`px-3 py-1 rounded-lg text-sm ${preview ? "bg-gray-100 font-medium" : "text-gray-500"}`}>预览</button>
-              </div>
-              {preview ? (
-                <div className="flex-1 overflow-y-auto px-12 py-8 prose prose-gray max-w-3xl mx-auto">
-                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{content}</Markdown>
-                </div>
-              ) : (
-                <textarea value={content} onChange={(e) => setContent(e.target.value)}
-                  className="flex-1 resize-none p-8 text-gray-800 font-mono text-sm leading-relaxed bg-transparent border-none outline-none"
-                  placeholder="用 Markdown 编写笔记..." />
-              )}
-            </div>
-          </div>
+          <TipTapEditor content={content} onChange={setContent} placeholder="开始编辑笔记..." />
         )}
       </div>
     </div>

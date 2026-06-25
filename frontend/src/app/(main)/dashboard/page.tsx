@@ -17,7 +17,7 @@ import { USER_ROLES } from "@/lib/constants";
 
 const studentNav = [
   { icon: Bookmark, label: "我的收藏", href: "/dashboard/favorites" },
-  { icon: FileEdit, label: "我的创作", href: "/workspace/drafts" },
+  { icon: FileEdit, label: "我的创作", href: "/workspace/creatures" },
   { icon: FileEdit, label: "错题本", href: "/dashboard/errors" },
   { icon: History, label: "测试历史", href: "/dashboard/history" },
 ];

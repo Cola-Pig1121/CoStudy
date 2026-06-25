@@ -4,28 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
-  Eye,
   Loader2,
-  Pencil,
   Save,
   Send,
   Sparkles,
 } from "lucide-react";
-import Markdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { TextbookNode } from "@/types";
+import { TipTapEditor } from "@/components/workspace/tiptap-editor";
 
 export default function NotesPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("# 知识笔记\n\n在这里编写你的笔记...\n\n支持 **Markdown** 和 $LaTeX$ 公式。\n\n## 示例\n\n- 列表项 1\n- 列表项 2\n\n$$E = mc^2$$\n");
-  const [preview, setPreview] = useState(false);
+  const [content, setContent] = useState("<p></p>");
   const [textbookId, setTextbookId] = useState<number | null>(null);
   const [textbooks, setTextbooks] = useState<TextbookNode[]>([]);
   const [saving, setSaving] = useState(false);
@@ -69,16 +63,16 @@ export default function NotesPage() {
 
   if (loading || !user) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-[calc(100vh-64px)]">
         <Loader2 className="h-6 w-6 animate-spin text-[#4a9d9a]" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* 工具栏 */}
-      <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-gray-100">
+      <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-gray-100 shrink-0">
         <input
           type="text"
           value={title}
@@ -126,20 +120,6 @@ export default function NotesPage() {
           )}
         </div>
 
-        {/* 编辑/预览切换 */}
-        <button
-          onClick={() => setPreview((v) => !v)}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors",
-            preview
-              ? "bg-[#e8b86d]/10 text-[#e8b86d]"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          )}
-        >
-          {preview ? <Eye className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-          {preview ? "预览中" : "编辑"}
-        </button>
-
         <div className="flex items-center gap-2">
           {saved && (
             <span className="text-xs text-[#e8b86d] flex items-center gap-1">
@@ -165,22 +145,9 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* 编辑器/预览区 */}
-      <div className="flex-1 flex overflow-hidden">
-        {preview ? (
-          <div className="flex-1 overflow-y-auto px-12 py-8 prose prose-gray max-w-3xl mx-auto">
-            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-              {content}
-            </Markdown>
-          </div>
-        ) : (
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="flex-1 resize-none p-8 text-gray-800 font-mono text-sm leading-relaxed bg-transparent border-none outline-none"
-            placeholder="用 Markdown 编写笔记..."
-          />
-        )}
+      {/* TipTap 编辑器 */}
+      <div className="flex-1 min-h-0">
+        <TipTapEditor content={content} onChange={setContent} placeholder="开始编写笔记..." />
       </div>
     </div>
   );

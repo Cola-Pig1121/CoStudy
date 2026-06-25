@@ -131,7 +131,7 @@ export default function DraftsPage() {
             return (
               <div key={r.id}
                 className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:shadow-black/[0.04] transition-all group cursor-pointer"
-                onClick={() => router.push(`/workspace/drafts/${r.id}`)}>
+                onClick={() => router.push(`/workspace/creatures/${r.id}`)}>
                 <div className="flex items-start gap-4">
                   {/* 类型图标 */}
                   <div className={`w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0`}>
