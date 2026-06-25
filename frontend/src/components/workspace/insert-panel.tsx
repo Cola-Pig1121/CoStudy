@@ -147,7 +147,13 @@ export function InsertPanel({ onClose }: InsertPanelProps) {
       document.body.removeChild(renderDiv);
 
       const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-      setRenderedImageUrl(URL.createObjectURL(svgBlob));
+      // 用 data URL 而非 blob URL，确保 <img> 能渲染 SVG
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(svgBlob);
+      });
+      setRenderedImageUrl(dataUrl);
       console.log(`Rendered in ${Math.round(performance.now() - t0)}ms`);
     } catch (e) {
       console.error("Render failed:", e);
