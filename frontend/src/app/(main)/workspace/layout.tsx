@@ -20,7 +20,7 @@ export default function WorkspaceLayout({
   const pathname = usePathname();
 
   return (
-    <div className="h-full bg-[#faf8f5] flex flex-col">
+    <div className="h-[calc(100vh-64px)] bg-[#faf8f5] flex flex-col">
       {/* 标签栏 */}
       <div className="bg-white border-b border-gray-100 px-6">
         <div className="mx-auto max-w-6xl flex items-center gap-1">

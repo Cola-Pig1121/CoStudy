@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
@@ -139,6 +139,7 @@ interface TipTapEditorProps {
 
 export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorProps) {
   const [showAI, setShowAI] = useState(false);
+  const [compositionTick, setCompositionTick] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -150,6 +151,13 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
     editorProps: {
       attributes: {
         class: "prose prose-gray max-w-none focus:outline-none min-h-[400px] px-10 py-8 leading-relaxed",
+      },
+      handleDOMEvents: {
+        // 中文 IME 组合结束时强制触发 FloatingMenu 重算
+        compositionend: () => {
+          setCompositionTick((t) => t + 1);
+          return false;
+        },
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -216,10 +224,12 @@ export function TipTapEditor({ content, onChange, placeholder }: TipTapEditorPro
 
       {/* FloatingMenu: 空行点击时弹出快捷操作 */}
       <FloatingMenu editor={editor}
-        shouldShow={({ editor }) => {
+        shouldShow={() => {
+          if (!editor) return false;
           if (!editor.isActive("paragraph")) return false;
-          const $from = editor.state.selection.$from;
-          return $from.parent.textContent.trim().length === 0;
+          // compositionTick 变化时强制重算，解决中文 IME 问题
+          void compositionTick;
+          return editor.state.selection.$from.parent.textContent.trim().length === 0;
         }}
         options={{ placement: "right-start", offset: 4 }}>
         <div className="flex items-center gap-0.5 bg-white rounded-xl shadow-lg shadow-black/10 border border-gray-100 p-1">
