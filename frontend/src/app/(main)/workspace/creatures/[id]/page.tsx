@@ -10,6 +10,7 @@ import {
   Loader2,
   Save,
   Send,
+  Sigma,
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,6 +18,7 @@ import { api } from "@/lib/api";
 import type { TextbookNode, SharedResource } from "@/types";
 import type { ExcalidrawAPI } from "@/components/workspace/excalidraw-editor";
 import { TipTapEditor } from "@/components/workspace/tiptap-editor";
+import { InsertPanel } from "@/components/workspace/insert-panel";
 
 const ExcalidrawWrapper = dynamic(
   () => import("@/components/workspace/excalidraw-editor").then((m) => m.ExcalidrawEditor),
@@ -47,6 +49,7 @@ export default function DraftDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showTree, setShowTree] = useState(false);
+  const [showInsert, setShowInsert] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPI | null>(null);
 
   useEffect(() => { if (!loading && !user) router.replace("/login"); }, [user, loading, router]);
@@ -166,7 +169,19 @@ export default function DraftDetailPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
+          {/* 插入公式按钮 */}
+          {isExcalidraw && (
+            <div className="relative">
+              <button onClick={() => setShowInsert((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#e8b86d]/40 hover:bg-[#e8b86d]/5 transition-colors">
+                <Sigma className="h-4 w-4 text-[#e8b86d]" />
+                插入公式
+              </button>
+              {showInsert && <InsertPanel onClose={() => setShowInsert(false)} excalidrawAPI={excalidrawAPIRef.current} />}
+            </div>
+          )}
+
           {saved && (
             <span className="text-xs text-[#4a9d9a] flex items-center gap-1"><Sparkles className="h-3 w-3" /> 已保存</span>
           )}

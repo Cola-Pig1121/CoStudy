@@ -7,7 +7,6 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { toPng } from "html-to-image";
-import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import {
   BookOpen,
   Check,
@@ -142,27 +141,57 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
     }
   };
 
-  /** 直接将 LaTeX/Markdown 作为文本元素插入 Excalidraw 画布 */
+  /** 直接将 LaTeX 作为文本插入 Excalidraw 画布（使用 updateScene） */
   const insertToCanvas = () => {
     if (!input.trim() || !excalidrawAPI) return;
     try {
       const text = mode === "latex" ? `$${input}$` : input;
-      const elements = convertToExcalidrawElements([
-        {
-          type: "text",
-          x: 200,
-          y: 200,
-          text,
-          fontSize: 20,
-          strokeColor: "#1e1e1e",
-        },
-      ]);
-      const current = excalidrawAPI.getSceneElements() ?? [];
-      excalidrawAPI.updateScene({ elements: [...current, ...elements] });
+      // 获取当前场景中心位置
+      const elements = excalidrawAPI.getSceneElements() ?? [];
+      const appState = excalidrawAPI.getAppState();
+      const centerX = appState.scrollX ? -appState.scrollX + 400 : 400;
+      const centerY = appState.scrollY ? -appState.scrollY + 300 : 300;
+
+      // 使用 updateScene 添加一个原始文本元素
+      const id = `formula_${Date.now()}`;
+      const newElement = {
+        type: "text",
+        id,
+        x: centerX,
+        y: centerY,
+        width: 200,
+        height: 40,
+        text,
+        fontSize: 24,
+        fontFamily: 5,
+        textAlign: "center",
+        strokeColor: "#1e1e1e",
+        backgroundColor: "transparent",
+        fillStyle: "solid",
+        strokeWidth: 1,
+        strokeStyle: "solid",
+        roughness: 0,
+        opacity: 100,
+        angle: 0,
+        seed: Math.floor(Math.random() * 2000000000),
+        version: 1,
+        versionNonce: Math.floor(Math.random() * 2000000000),
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: null,
+        locked: false,
+        groupIds: [],
+        frameId: null,
+        roundness: null,
+        index: "a0",
+        autoResize: true,
+        lineHeight: 1.25,
+      };
+      excalidrawAPI.updateScene({ elements: [...elements, newElement as any] });
       onClose();
     } catch (e) {
       console.error("Insert to canvas failed:", e);
-      alert("插入失败，请尝试复制源码后手动粘贴");
     }
   };
 
