@@ -9,6 +9,7 @@ import {
   Clock,
   FileText,
   Loader2,
+  Play,
   Send,
 } from "lucide-react";
 import Markdown from "react-markdown";
