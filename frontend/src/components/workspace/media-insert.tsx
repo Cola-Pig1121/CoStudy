@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Globe, ImagePlus, Loader2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type InsertMode = "upload" | "url" | "embed";
 

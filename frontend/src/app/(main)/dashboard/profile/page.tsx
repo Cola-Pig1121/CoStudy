@@ -15,7 +15,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function ProfilePage() {
   const { user, loading, refreshUser } = useAuth();

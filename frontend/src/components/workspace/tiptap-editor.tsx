@@ -31,7 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import "katex/dist/katex.min.css";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /* ── 工具按钮 ── */
 function Btn({

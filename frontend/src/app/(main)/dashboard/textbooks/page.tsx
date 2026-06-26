@@ -21,7 +21,7 @@ import type { TextbookNode } from "@/types";
 
 const LEVEL_LABELS = ["科目", "教材", "单元", "章节"];
 const LEVEL_COLORS = ["#4a9d9a", "#e8b86d", "#6b8e8e", "#c17767"];
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function flatten(nodes: TextbookNode[]): TextbookNode[] {
   return nodes.flatMap((n) => [n, ...(n.children ? flatten(n.children) : [])]);
