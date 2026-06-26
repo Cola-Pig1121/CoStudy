@@ -703,6 +703,16 @@ CREATE INDEX idx_chat_conversation ON chat_messages(conversation_id);
 | PUT | `/providers/{id}` | 更新供应商配置 | 管理员 |
 | DELETE | `/providers/{id}` | 删除供应商 | 管理员 |
 | POST | `/providers/{id}/test` | 测试供应商连接 | 管理员 |
+| GET | `/providers/scan` | 扫描所有供应商模型 + 检测思考强度 | 管理员 |
+| GET | `/providers/{id}/scan` | 扫描指定供应商模型 | 管理员 |
+| GET | `/providers/models/{model}/capabilities` | 获取模型能力 (思考强度/上下文窗口) | 管理员 |
+| GET | `/providers/reasoning-levels` | 获取思考强度等级列表 | 管理员 |
+
+> **litellm 统一模型网关**: 管理员在后台配置供应商 (Base URL + API Key + 模型列表)，
+> 系统通过 litellm 自动路由调用。支持 OpenAI 兼容格式和 Anthropic 格式。
+> - `litellm.supports_reasoning()` 检测模型是否支持思考强度
+> - `litellm.model_prices_and_context_window` 获取模型元数据 (上下文窗口/成本)
+> - `reasoning_effort` 参数统一传入，litellm 自动映射到各厂商 API
 
 > **Eve Agent** 基于 [eve.dev](https://eve.dev) 框架，文件系统驱动：
 > - `agent/instructions.md`: 角色定义 (学习助手 + 合规约束)

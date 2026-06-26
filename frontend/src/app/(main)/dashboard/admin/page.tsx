@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Brain,
   Check,
   CheckCircle,
   Globe,
   Loader2,
   Plus,
+  RefreshCw,
   Server,
   Trash2,
   X,
@@ -48,6 +50,8 @@ export default function AdminPage() {
   const [formModels, setFormModels] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<number | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [modelCaps, setModelCaps] = useState<any[]>([]);
 
   useEffect(() => { if (!loading && !user) router.replace("/login"); }, [user, loading, router]);
   useEffect(() => { if (user?.role === "admin") loadProviders(); }, [user]);
@@ -92,6 +96,18 @@ export default function AdminPage() {
   };
 
   const resetForm = () => { setFormName(""); setFormUrl(""); setFormKey(""); setFormFormat("openai"); setFormModels(""); };
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      const data = await api.get<any[]>("/api/v1/providers/scan");
+      setModelCaps(data as any);
+    } catch (e: any) {
+      alert(e?.detail ?? "扫描失败");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   if (loading || !user) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><Loader2 className="h-6 w-6 animate-spin text-[#4a9d9a]" /></div>;
   if (user.role !== "admin") return <div className="flex items-center justify-center h-[calc(100vh-64px)] text-gray-400">仅管理员可访问</div>;
@@ -160,6 +176,63 @@ export default function AdminPage() {
               <div className="mt-2 text-[11px] text-gray-400">API 格式: {p.api_format} · Key: {p.api_key_masked}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 模型能力扫描 */}
+      {providers.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800">模型能力分析</h2>
+            <button onClick={handleScan} disabled={scanning}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:border-[#e8b86d]/40 hover:bg-[#e8b86d]/5 transition-colors disabled:opacity-50">
+              {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {scanning ? "扫描中..." : "扫描模型"}
+            </button>
+          </div>
+
+          {modelCaps.length > 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">模型</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">供应商</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">思考强度</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">上下文窗口</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modelCaps.map((m, i) => (
+                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-800">{m.model_id}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500">{m.provider_name}</td>
+                      <td className="px-4 py-2.5">
+                        {m.supports_reasoning ? (
+                          <div className="flex items-center gap-1">
+                            <Brain className="h-3.5 w-3.5 text-[#e8b86d]" />
+                            <span className="text-xs text-[#e8b86d] font-medium">
+                              {m.available_efforts?.join(" / ")}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500">
+                        {m.context_window ? `${(m.context_window / 1000).toFixed(0)}K` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+              <RefreshCw className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">点击"扫描模型"检测已配置供应商的模型能力</p>
+            </div>
+          )}
         </div>
       )}
 

@@ -149,3 +149,54 @@ async def test_provider(provider_id: int, db: DbSession, admin: RequireAdmin) ->
         return {"success": True, "model": models[0], "response": response.choices[0].message.content}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ── 模型扫描 + 思考强度检测 ──
+
+@router.get("/scan")
+async def scan_models(db: DbSession, admin: RequireAdmin) -> list[dict]:
+    """扫描所有供应商的模型列表，检测思考强度支持。"""
+    from app.services.llm_service import scan_provider_models
+    return await scan_provider_models()
+
+
+@router.get("/{provider_id}/scan")
+async def scan_provider_models_endpoint(
+    provider_id: int, db: DbSession, admin: RequireAdmin
+) -> list[dict]:
+    """扫描指定供应商的模型列表。"""
+    from app.services.llm_service import scan_provider_models
+    return await scan_provider_models(provider_id)
+
+
+@router.get("/models/{model_name}/capabilities")
+async def get_model_capabilities(
+    model_name: str, db: DbSession, admin: RequireAdmin
+) -> dict:
+    """获取指定模型的能力信息（思考强度、上下文窗口等）。"""
+    from app.services.llm_service import supports_reasoning, load_providers
+    await load_providers()
+    reasoning = supports_reasoning(model_name)
+    config = {}
+    # 查找供应商信息
+    async with db.begin():
+        result = await db.execute(select(ModelProvider).where(ModelProvider.is_active == True))
+        for p in result.scalars().all():
+            models = json.loads(p.models) if p.models else []
+            if model_name in models:
+                config = {"provider": p.name, "api_format": p.api_format}
+                break
+    return {"model": model_name, **config, **reasoning}
+
+
+@router.get("/reasoning-levels")
+async def get_reasoning_levels() -> dict:
+    """获取所有可用的思考强度等级。"""
+    return {
+        "levels": [
+            {"value": "low", "label": "快速", "desc": "简短回答，适合简单问题"},
+            {"value": "medium", "label": "标准", "desc": "平衡速度与质量"},
+            {"value": "high", "label": "深度", "desc": "详细推理，适合复杂问题"},
+            {"value": "max", "label": "极致", "desc": "最强推理，耗时较长"},
+        ]
+    }
