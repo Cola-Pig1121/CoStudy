@@ -6,7 +6,7 @@ import Markdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { toSvg } from "html-to-image";
+import { toPng } from "html-to-image";
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import {
   BookOpen,
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  Image as ImageIcon,
   Loader2,
   Sigma,
   Type,
@@ -169,17 +170,52 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
     if (!input.trim()) return;
     setRendering(true);
     try {
+      // 创建隔离 div
+      const renderDiv = document.createElement("div");
+      renderDiv.style.cssText = "position:fixed;left:-9999px;top:0;padding:20px 28px;background:white;border-radius:8px;display:inline-block;max-width:700px;font-family:'LXGW WenKai',sans-serif;font-size:20px;color:#1e1e1e;";
+      document.body.appendChild(renderDiv);
+
       if (mode === "latex") {
-        // 直接渲染 KaTeX HTML 到预览区，不做任何格式转换
-        setRenderedImageUrl(null); // 清除旧图片
-        setRenderedHtml(katex.renderToString(input, { throwOnError: false, displayMode: true }));
+        renderDiv.innerHTML = katex.renderToString(input, { throwOnError: false, displayMode: true });
       } else {
-        // Markdown 也直接渲染 HTML
-        setRenderedImageUrl(null);
-        setRenderedHtml(input);
+        const { createRoot } = await import("react-dom/client");
+        const root = createRoot(renderDiv);
+        root.render(
+          <div style={{ background: "white", padding: "4px" }}>
+            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{input}</Markdown>
+          </div>
+        );
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       }
-    } catch (e) {
-      console.error("Render failed:", e);
+
+      // toPng with fontEmbedCSS to avoid canvas taint
+      const dataUrl = await toPng(renderDiv, {
+        pixelRatio: 2,
+        backgroundColor: "white",
+        fontEmbedCSS: "inline",
+        cacheBust: true,
+      });
+
+      // 清理
+      if (mode === "markdown") renderDiv.innerHTML = "";
+      document.body.removeChild(renderDiv);
+
+      // 复制到剪贴板 (HTTPS 下可用)
+      const resp = await fetch(dataUrl);
+      const blob = await resp.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob }),
+      ]);
+
+      setCopied(true);
+      setRenderedImageUrl(dataUrl);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e: any) {
+      console.error("Render/copy failed:", e);
+      // 如果 clipboard 不可用（HTTP），fallback 为显示图片
+      if (e?.name === "NotAllowedError" || e?.message?.includes("clipboard")) {
+        alert("请通过 HTTPS 访问以使用复制功能。\n当前可通过「渲染预览」查看后截图粘贴。");
+      }
     } finally {
       setRendering(false);
     }
@@ -230,16 +266,17 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
               <Loader2 className="h-4 w-4 animate-spin mr-2 text-[#e8b86d]" />渲染中…
             </div>
           )}
-          {renderedHtml && !rendering && (
-            <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-4 bg-[#4a9d9a]/3">
+          {renderedImageUrl && !rendering && (
+            <div className="border-2 border-dashed border-[#4a9d9a]/30 rounded-xl p-3 bg-[#4a9d9a]/3">
               <div className="text-[11px] text-[#4a9d9a] font-medium mb-2 flex items-center gap-1.5">
-                ✅ 渲染完成 · 右键下方区域截图粘贴到 Excalidraw
+                {copied ? "✅ 已复制到剪贴板，在 Excalidraw 中 Ctrl+V 粘贴" : "渲染完成 · 点击下方按钮复制"}
               </div>
-              <div
-                ref={previewRef}
-                className="rounded-lg bg-white border border-gray-200 shadow-sm p-4 flex items-center justify-center"
-                dangerouslySetInnerHTML={{ __html: renderedHtml }}
-              />
+              <img src={renderedImageUrl} alt="rendered" className="max-w-full rounded-lg bg-white border border-gray-200 shadow-sm" />
+            </div>
+          )}
+          {renderedHtml && !rendering && !renderedImageUrl && (
+            <div className="border border-gray-200 rounded-xl p-4 bg-white">
+              <div ref={previewRef} dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             </div>
           )}
         </div>
@@ -263,8 +300,8 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
             <button onClick={renderToImage} disabled={!input.trim() || rendering}
               className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 text-sm rounded-xl font-medium transition-colors",
                 rendering ? "bg-[#e8b86d]/20 text-[#e8b86d]" : "bg-[#e8b86d] text-white hover:bg-[#e8b86d]/90 disabled:opacity-50")}>
-              {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sigma className="h-4 w-4" />}
-              {rendering ? "渲染中…" : "渲染预览"}
+              {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+              {rendering ? "渲染中…" : "复制为图片"}
             </button>
           </div>
         </div>
