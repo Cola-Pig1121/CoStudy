@@ -119,7 +119,7 @@ async def add_question(paper_id: int, payload: QuestionCreate, db: DbSession, us
 
     q = ExamQuestion(
         paper_id=paper_id, type=payload.type, stem=payload.stem,
-        options=payload.options, answer=payload.answer,
+        options=json.dumps(payload.options, ensure_ascii=False), answer=payload.answer,
         explanation=payload.explanation, difficulty=payload.difficulty,
         sort_order=count,
     )
@@ -289,9 +289,10 @@ def _paper_dict(p: ExamPaper) -> dict:
     }
 
 def _question_dict(q: ExamQuestion, hide_answer: bool = False) -> dict:
+    options = json.loads(q.options) if isinstance(q.options, str) else (q.options or [])
     return {
         "id": q.id, "paper_id": q.paper_id, "type": q.type, "stem": q.stem,
-        "options": q.options, "answer": None if hide_answer else q.answer,
+        "options": options, "answer": None if hide_answer else q.answer,
         "explanation": None if hide_answer else q.explanation,
         "difficulty": q.difficulty, "sort_order": q.sort_order,
     }

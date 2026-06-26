@@ -37,7 +37,7 @@ class ExamQuestion(Base):
     )
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # 选择题/填空题/解答题
     stem: Mapped[str] = mapped_column(Text, nullable=False)  # 题干 (Markdown)
-    options: Mapped[list[Any]] = mapped_column(default=list, nullable=False)  # JSON: ["A. ...", ...]
+    options: Mapped[str] = mapped_column(Text, nullable=False, default="[]")  # JSON: ["A. ...", ...]
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=1)  # 1-5
