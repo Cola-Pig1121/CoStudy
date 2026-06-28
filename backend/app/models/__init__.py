@@ -5,6 +5,7 @@ from app.models.provider import ModelProvider
 from app.models.resource import Favorite, ReviewLog, SharedResource
 from app.models.textbook import TextbookNode
 from app.models.user import User
+from app.models.video import MicroCourseVideo
 
 __all__ = ["User", "TextbookNode", "SharedResource", "Favorite", "ReviewLog", "ModelProvider", "ChatLog",
-           "ExamPaper", "ExamQuestion", "ExamAttempt", "ErrorNote"]
+           "ExamPaper", "ExamQuestion", "ExamAttempt", "ErrorNote", "MicroCourseVideo"]

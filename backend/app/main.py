@@ -86,6 +86,7 @@ from app.api.providers import router as providers_router  # noqa: E402
 from app.api.upload import router as upload_router  # noqa: E402
 from app.api.render import router as render_router  # noqa: E402
 from app.api.exams import router as exams_router  # noqa: E402
+from app.api.videos import router as videos_router  # noqa: E402
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(textbooks_router, prefix=settings.API_V1_PREFIX)
@@ -96,3 +97,4 @@ app.include_router(providers_router, prefix=settings.API_V1_PREFIX)
 app.include_router(upload_router, prefix=settings.API_V1_PREFIX)
 app.include_router(render_router, prefix=settings.API_V1_PREFIX)
 app.include_router(exams_router, prefix=settings.API_V1_PREFIX)
+app.include_router(videos_router, prefix=settings.API_V1_PREFIX)
