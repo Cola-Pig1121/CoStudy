@@ -13,6 +13,7 @@ interface VideoDetail {
   title: string;
   description: string | null;
   hls_url: string | null;
+  thumbnail_url: string | null;
   duration_seconds: number | null;
   view_count: number;
   status: number;
