@@ -1,4 +1,0 @@
-  File "<string>", line 9
-    chan.exec_command('''for p in / /login /register /tree /dashboard /exam /exam/1 /ai /workspace/mindmap /workspace/notes /workspace/creatures; do
-                      ^
-SyntaxError: unterminated triple-quoted string literal (detected at line 11)
