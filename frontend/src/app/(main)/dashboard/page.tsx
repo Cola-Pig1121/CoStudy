@@ -116,7 +116,7 @@ export default function DashboardPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Link
-                href="/dashboard/admin"
+                href="/dashboard/admin/review"
                 className="group flex items-center gap-4 rounded-2xl bg-white border border-gray-100 p-6 hover:border-[#e8b86d]/40 hover:shadow-lg transition-all"
               >
                 <div className="w-12 h-12 rounded-xl bg-[#e8b86d]/10 group-hover:bg-[#e8b86d] flex items-center justify-center transition-colors">
