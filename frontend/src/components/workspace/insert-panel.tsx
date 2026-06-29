@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { toPng } from "html-to-image";
+import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import {
   BookOpen,
   Check,
@@ -141,54 +142,32 @@ export function InsertPanel({ onClose, excalidrawAPI }: InsertPanelProps) {
     }
   };
 
-  /** 直接将 LaTeX 作为文本插入 Excalidraw 画布（使用 updateScene） */
+  /** 将 LaTeX 公式插入 Excalidraw 画布 */
   const insertToCanvas = () => {
     if (!input.trim() || !excalidrawAPI) return;
     try {
       const text = mode === "latex" ? `$${input}$` : input;
-      // 获取当前场景中心位置
       const elements = excalidrawAPI.getSceneElements() ?? [];
       const appState = excalidrawAPI.getAppState();
       const centerX = appState.scrollX ? -appState.scrollX + 400 : 400;
       const centerY = appState.scrollY ? -appState.scrollY + 300 : 300;
 
-      // 使用 updateScene 添加一个原始文本元素
-      const id = `formula_${Date.now()}`;
-      const newElement = {
-        type: "text",
-        id,
-        x: centerX,
-        y: centerY,
-        width: 200,
-        height: 40,
-        text,
-        fontSize: 24,
-        fontFamily: 5,
-        textAlign: "center",
-        strokeColor: "#1e1e1e",
-        backgroundColor: "transparent",
-        fillStyle: "solid",
-        strokeWidth: 1,
-        strokeStyle: "solid",
-        roughness: 0,
-        opacity: 100,
-        angle: 0,
-        seed: Math.floor(Math.random() * 2000000000),
-        version: 1,
-        versionNonce: Math.floor(Math.random() * 2000000000),
-        isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        groupIds: [],
-        frameId: null,
-        roundness: null,
-        index: "a0",
-        autoResize: true,
-        lineHeight: 1.25,
-      };
-      excalidrawAPI.updateScene({ elements: [...elements, newElement as any] });
+      // 用 convertToExcalidrawElements 创建文本元素
+      // 这个函数由 Excalidraw 官方提供，能正确设置公式渲染所需的属性
+      const newElements = convertToExcalidrawElements([
+        {
+          type: "text",
+          x: centerX,
+          y: centerY,
+          text,
+          fontSize: mode === "latex" ? 24 : 16,
+          strokeColor: "#1e1e1e",
+          backgroundColor: "transparent",
+          textAlign: "center",
+        },
+      ]);
+
+      excalidrawAPI.updateScene({ elements: [...elements, ...newElements as any] });
       onClose();
     } catch (e) {
       console.error("Insert to canvas failed:", e);
